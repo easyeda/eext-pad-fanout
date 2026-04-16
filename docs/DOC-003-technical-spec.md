@@ -111,33 +111,14 @@ interface IViaType {
                            │ 菜单点击 padFanout()
                            ↓
                     ┌─────────────┐
-              ┌───→│   ACTIVE    │ ← 扇出模式已启用
-              │     └──────┬──────┘
-              │            │ onMouseClick 焊盘
-              │            ↓
-              │     ┌─────────────┐
-              │     │  PAD_READY  │ ← 焊盘已选中
-              │     └──────┬──────┘
-              │            │ onMouseMove
-              │            ↓
-              │     ┌─────────────┐
-              │     │  PREVIEWING │ ← 预览状态
-              │     └──────┬──────┘
-              │            │ 左键 onMouseClick
-              │            ↓
-              │     ┌─────────────┐
-              │     │  CREATING   │ ← 创建过孔中
-              │     └──────┬──────┘
-              │            │
-              │      ┌─────┴─────┐
-              │      ↓           ↓
-              │  [DRC通过]   [DRC失败]
-              │      ↓           ↓
-              │ ┌─────────┐ ┌─────────┐
-              │ │COMPLETE │ │ CANCEL  │
-              │ └────┬────┘ └────┬────┘
-              │      │            │
-              └──────┴────────────┘
+                    │ PAD_SELECTED│ ← 焊盘已选中
+                    └──────┬──────┘
+                           │ 点击目标位置
+                           ↓
+                    ┌─────────────┐
+                    │ 创建扇出过孔 │
+                    │   和走线    │
+                    └──────┬──────┘
                            │
                            ↓
                     ┌─────────────┐
@@ -150,12 +131,7 @@ interface IViaType {
 | 状态 | 说明 | 进入条件 | 退出条件 |
 |------|------|----------|----------|
 | IDLE | 初始状态 | 插件加载/操作完成 | 点击菜单 |
-| ACTIVE | 扇出模式已启用 | 点击菜单 | 点击焊盘/取消 |
-| PAD_READY | 焊盘已选中 | 点击焊盘 | 左键确认/右键取消 |
-| PREVIEWING | 预览状态 | 移动鼠标 | 确认/取消 |
-| CREATING | 创建中 | 左键点击 | DRC检查 |
-| COMPLETE | 完成 | DRC通过 | 返回IDLE |
-| CANCEL | 取消 | DRC失败/右键/ESC | 返回IDLE |
+| PAD_SELECTED | 焊盘已选中 | 点击焊盘 | 点击目标位置创建扇出 |
 
 ## 3.6 事件流
 
@@ -180,7 +156,7 @@ eda.sys_IFrame.show('fanout-dialog')
     ↓
 onMouseClick(event)
     ↓
-检查 isActive && !selectedPad
+检查 workState == 'IDLE'
     ↓
 eda.pcb_SelectControl.getSelectedPrimitives()
     ↓
@@ -188,37 +164,31 @@ eda.pcb_SelectControl.getSelectedPrimitives()
     ↓
 selectedPad = pad
     ↓
-updatePreview(event)  // 开始预览
+workState = 'PAD_SELECTED'
 ```
 
-### 3.6.3 确认扇出
+### 3.6.3 创建扇出
 
 ```
-用户左键点击
+用户点击目标位置
     ↓
 onMouseClick(event)
     ↓
-检查 selectedPad != null
+检查 workState == 'PAD_SELECTED'
     ↓
-calculateAngle(selectedPad, cursorPos)
+getCurrentMousePosition() 获取目标位置
     ↓
-removePreviewVias()
+calculateViaPosition(padPos, targetPos) 计算过孔位置
     ↓
-createRealVia(selectedPad, angle)
+createVia(net, x, y, ...) 创建过孔
     ↓
-checkDrc(newVia)
+createLine(net, layer, ...) 创建走线
     ↓
-    ├── 通过 → createFanoutWire()
-    │          showToast('扇出成功')
-    │          resetState()
-    │              ↓
-    │          IDLE
-    │
-    └── 失败 → showToast('DRC检查失败')
-               deletePrimitive(newVia)
-               cancelFanout()
-                   ↓
-               IDLE
+showToast('扇出成功')
+    ↓
+resetState()
+    ↓
+IDLE
 ```
 
 ## 3.7 常量定义

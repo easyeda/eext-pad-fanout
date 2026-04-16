@@ -1,11 +1,195 @@
-<!doctype html>
-<html lang="zh-Hans">
-	<head>
-		<title>Inner Frame</title>
-		<meta charset="utf-8" />
-		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-	</head>
-	<body>
-		<p>这是一个示例 IFrame 页面</p>
-	</body>
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="UTF-8">
+	<style>
+		* { margin: 0; padding: 0; box-sizing: border-box; }
+		body {
+			font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+			background: transparent;
+		}
+		.fanout-panel {
+			width: 200px;
+			background: #1e1e1e;
+			border: 1px solid #3a3a3a;
+			border-radius: 8px;
+			box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+			overflow: hidden;
+		}
+		.panel-header {
+			background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+			color: #fff;
+			padding: 10px 14px;
+			display: flex;
+			align-items: center;
+			gap: 8px;
+		}
+		.panel-header svg {
+			width: 16px;
+			height: 16px;
+		}
+		.panel-header h3 {
+			font-size: 12px;
+			font-weight: 600;
+			margin: 0;
+		}
+		.panel-content {
+			padding: 12px;
+		}
+		.status-badge {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			background: #2d2d2d;
+			border-radius: 4px;
+			padding: 8px 10px;
+			margin-bottom: 10px;
+		}
+		.status-label {
+			font-size: 10px;
+			color: #888;
+		}
+		.status-value {
+			font-size: 10px;
+			font-weight: 600;
+			padding: 2px 6px;
+			border-radius: 8px;
+		}
+		.status-value.inactive { background: #3d3d3d; color: #666; }
+		.status-value.active { background: #4caf50; color: #fff; }
+		.form-group { margin-bottom: 8px; }
+		.form-group label {
+			display: block;
+			font-size: 10px;
+			color: #888;
+			margin-bottom: 4px;
+		}
+		.form-group select,
+		.form-group input {
+			width: 100%;
+			padding: 6px 8px;
+			background: #2d2d2d;
+			border: 1px solid #404040;
+			border-radius: 4px;
+			color: #e0e0e0;
+			font-size: 11px;
+		}
+		.btn-primary {
+			width: 100%;
+			padding: 8px 12px;
+			background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+			border: none;
+			border-radius: 4px;
+			color: #fff;
+			font-size: 11px;
+			font-weight: 600;
+			cursor: pointer;
+			margin-top: 4px;
+		}
+		.btn-secondary { background: #3d3d3d; color: #aaa; }
+		.panel-footer {
+			padding: 10px 12px;
+			background: #252525;
+			border-top: 1px solid #3a3a3a;
+		}
+		.hints {
+			font-size: 9px;
+			color: #666;
+			line-height: 1.5;
+		}
+		.hints .key {
+			background: #3d3d3d;
+			padding: 1px 4px;
+			border-radius: 2px;
+			color: #aaa;
+		}
+	</style>
+</head>
+<body>
+	<div class="fanout-panel">
+		<div class="panel-header">
+			<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+				<circle cx="12" cy="12" r="3"/>
+				<path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4"/>
+			</svg>
+			<h3>单焊盘扇出</h3>
+		</div>
+
+		<div class="panel-content">
+			<div class="status-badge">
+				<span class="status-label">状态</span>
+				<span class="status-value inactive" id="status-value">未启用</span>
+			</div>
+
+			<div class="form-group">
+				<label>过孔类型</label>
+				<select id="via-type">
+					<option value="through">通孔</option>
+					<option value="blind_1_2">盲孔 1-2</option>
+					<option value="blind_1_3">盲孔 1-3</option>
+				</select>
+			</div>
+
+			<div class="form-group">
+				<label>线宽 (mm)</label>
+				<input type="number" id="line-width" value="0.254" step="0.01" min="0.1" max="10">
+			</div>
+
+			<button class="btn-primary" id="btn-toggle" onclick="toggleMode()">启用扇出</button>
+			<button class="btn-primary btn-secondary" id="btn-cancel" style="display:none; margin-top:4px;" onclick="cancelFanout()">取消</button>
+		</div>
+
+		<div class="panel-footer">
+			<div class="hints">
+				<div><span class="key">LMB</span> 确认扇出 | <span class="key">RMB</span>/<span class="key">ESC</span> 取消</div>
+			</div>
+		</div>
+	</div>
+
+	<script>
+		var isEnabled = false;
+		function sendMessage(action) {
+			console.warn('[IFrame] 发送 MessageBus 消息, action:', action);
+			if (typeof eda !== 'undefined' && eda.sys_MessageBus) {
+				eda.sys_MessageBus.publishPublic('pad-fanout-action', { action: action });
+				console.warn('[IFrame] MessageBus 消息已发送 (publishPublic)');
+			} else {
+				console.warn('[IFrame] eda 或 sys_MessageBus 不可用');
+			}
+		}
+		function toggleMode() {
+			console.warn('[IFrame] toggleMode() 被调用, isEnabled:', isEnabled);
+			isEnabled = !isEnabled;
+			var btn = document.getElementById('btn-toggle');
+			var cancelBtn = document.getElementById('btn-cancel');
+			var status = document.getElementById('status-value');
+			if (isEnabled) {
+				console.warn('[IFrame] 启用扇出模式');
+				status.className = 'status-value active';
+				status.textContent = '已启用';
+				btn.textContent = '已启用';
+				btn.disabled = true;
+				cancelBtn.style.display = 'block';
+				sendMessage('enable');
+			} else {
+				cancelFanout();
+			}
+		}
+		function cancelFanout() {
+			console.warn('[IFrame] cancelFanout() 被调用');
+			isEnabled = false;
+			var btn = document.getElementById('btn-toggle');
+			var cancelBtn = document.getElementById('btn-cancel');
+			var status = document.getElementById('status-value');
+			status.className = 'status-value inactive';
+			status.textContent = '未启用';
+			btn.textContent = '启用扇出';
+			btn.disabled = false;
+			cancelBtn.style.display = 'none';
+			sendMessage('cancel');
+		}
+		console.warn('[IFrame] iframe 脚本已加载');
+		console.warn('[IFrame] 检查 eda 是否可用:', typeof eda);
+	</script>
+</body>
 </html>
