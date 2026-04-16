@@ -59,9 +59,21 @@ export function padFanout(): void {
 	subscribeMessage();
 
 	console.warn('[PadFanout] 打开 iframe...');
-	eda.sys_IFrame.openIFrame('./iframe/index.html', 200, 290, 'pad-fanout-dialog');
+	eda.sys_IFrame.openIFrame('./iframe/index.html', 200, 290, 'pad-fanout-dialog', {
+		buttonCallbackFn: (button) => {
+			console.warn('[PadFanout] iframe 按钮被点击:', button);
+			if (button === 'close') {
+				handleIframeClose();
+			}
+		},
+	});
 
 	console.warn('[PadFanout] ============================');
+}
+
+function handleIframeClose(): void {
+	console.warn('[PadFanout] iframe 弹窗被关闭');
+	cancelFanout();
 }
 
 function registerEventHandlers(): void {
@@ -235,7 +247,7 @@ async function createFanout(targetPos: { x: number; y: number }): Promise<void> 
 
 		console.warn('[Fanout] 走线创建结果:', lineResult);
 
-		resetState();
+		resetAfterFanout();
 		eda.sys_Message.showToastMessage('扇出成功', ESYS_ToastMessageType.INFO);
 	}
 	catch (err) {
@@ -247,6 +259,14 @@ async function createFanout(targetPos: { x: number; y: number }): Promise<void> 
 function resetState(): void {
 	console.warn('[PadFanout] 重置状态');
 	fanoutState.isEnabled = false;
+	fanoutState.workState = 'IDLE';
+	fanoutState.selectedPadPosition = null;
+	fanoutState.selectedPadNet = null;
+	fanoutState.ignoreNextEmptyClick = false;
+}
+
+function resetAfterFanout(): void {
+	console.warn('[PadFanout] 扇出完成后重置（保持启用状态）');
 	fanoutState.workState = 'IDLE';
 	fanoutState.selectedPadPosition = null;
 	fanoutState.selectedPadNet = null;

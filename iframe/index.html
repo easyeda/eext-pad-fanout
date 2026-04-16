@@ -188,6 +188,12 @@
 			cancelBtn.style.display = 'none';
 			sendMessage('cancel');
 		}
+		document.addEventListener('keydown', function(e) {
+			if (e.key === 'Escape' && isEnabled) {
+				console.warn('[IFrame] ESC 键按下，取消扇出');
+				cancelFanout();
+			}
+		});
 		console.warn('[IFrame] iframe 脚本已加载');
 		console.warn('[IFrame] 检查 eda 是否可用:', typeof eda);
 	</script>
