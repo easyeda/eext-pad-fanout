@@ -5,12 +5,20 @@
  * 操作：点击焊盘选择 → 点击目标位置创建过孔和走线
  */
 import * as extensionConfig from '../extension.json';
+/// <reference types="@jlceda/pro-api-types" />
 
 function mmToMil(mm: number): number {
 	return eda.sys_Unit.mmToMil(mm);
 }
 
-const DEFAULT_FANOUT_DISTANCE_MM = 2.54;
+function milToMm(mil: number): number {
+	return eda.sys_Unit.milToMm(mil);
+}
+
+function formatPos(x: number, y: number): string {
+	return `(${milToMm(x).toFixed(4)} mm, ${milToMm(y).toFixed(4)} mm)`;
+}
+
 const DEFAULT_VIA_DIAMETER_MM = 0.6;
 const DEFAULT_HOLE_DIAMETER_MM = 0.3;
 const DEFAULT_LINE_WIDTH_MM = 0.254;
@@ -22,6 +30,8 @@ interface FanoutState {
 	isEnabled: boolean;
 	selectedPadPosition: { x: number; y: number } | null;
 	selectedPadNet: string | null;
+	selectedPadShape: string | null;
+	selectedPadRotation: number | null;
 	workState: WorkState;
 	ignoreNextEmptyClick: boolean;
 }
@@ -30,6 +40,8 @@ const fanoutState: FanoutState = {
 	isEnabled: false,
 	selectedPadPosition: null,
 	selectedPadNet: null,
+	selectedPadShape: null,
+	selectedPadRotation: null,
 	workState: 'IDLE',
 	ignoreNextEmptyClick: false,
 };
@@ -128,6 +140,7 @@ async function handleMouseEvent(
 	}
 
 	if (!props || props.length === 0) {
+		console.warn('[Fanout] Props为空');
 		if (fanoutState.workState === 'PAD_SELECTED') {
 			if (fanoutState.ignoreNextEmptyClick) {
 				fanoutState.ignoreNextEmptyClick = false;
@@ -146,38 +159,67 @@ async function handleMouseEvent(
 	}
 
 	const prim = props[0];
-	console.warn('[Fanout] 图元类型:', prim.primitiveType);
+	console.warn('[Fanout] 图元类型:', prim.primitiveType, '图元ID:', prim.primitiveId);
+	console.warn('[Fanout] EPCB_PrimitiveType.PAD:', EPCB_PrimitiveType.PAD);
+	console.warn('[Fanout] 比较结果:', prim.primitiveType === EPCB_PrimitiveType.PAD);
 
 	const isPad = prim.primitiveType === EPCB_PrimitiveType.PAD
 		|| prim.primitiveType === EPCB_PrimitiveType.COMPONENT_PAD;
 
+	console.warn('[Fanout] isPad:', isPad, 'workState:', fanoutState.workState);
+
 	if (isPad && fanoutState.workState === 'IDLE') {
+		console.warn('[Fanout] 进入选择焊盘逻辑');
 		try {
 			const primitives = await eda.pcb_SelectControl.getAllSelectedPrimitives();
 			console.warn('[Fanout] 选中图元数量:', primitives?.length);
 
-			if (primitives && primitives.length > 0) {
-				for (const p of primitives) {
-					const primitiveType = p.getState_PrimitiveType();
-					if (primitiveType === EPCB_PrimitiveType.PAD
-						|| primitiveType === EPCB_PrimitiveType.COMPONENT_PAD) {
-						const padPrim = p as unknown as {
-							getState_X: () => number;
-							getState_Y: () => number;
-							getState_Net: () => string | undefined;
-						};
-						const x = padPrim.getState_X();
-						const y = padPrim.getState_Y();
-						const net = padPrim.getState_Net();
+			if (!primitives || primitives.length === 0) {
+				console.warn('[Fanout] 没有选中的图元');
+				return;
+			}
 
-						console.warn(`[Fanout] 选中焊盘(mil): (${x}, ${y}) 网络: ${net}`);
+			for (const p of primitives) {
+				const primitiveType = p.getState_PrimitiveType();
+				console.warn('[Fanout] 图元类型检查:', primitiveType, '=== PAD:', primitiveType === EPCB_PrimitiveType.PAD);
 
-						fanoutState.selectedPadPosition = { x, y };
-						fanoutState.selectedPadNet = net || null;
-						fanoutState.workState = 'PAD_SELECTED';
-						fanoutState.ignoreNextEmptyClick = true;
-						break;
-					}
+				if (primitiveType === EPCB_PrimitiveType.PAD
+					|| primitiveType === EPCB_PrimitiveType.COMPONENT_PAD) {
+					const padPrim = p as unknown as {
+						getState_X: () => number;
+						getState_Y: () => number;
+						getState_Net: () => string | undefined;
+						getState_Pad: () => TPCB_PrimitivePadShape | undefined;
+						getState_Rotation: () => number;
+						getState_ParentComponentPrimitiveId?: () => string;
+					};
+					const x = padPrim.getState_X();
+					const y = padPrim.getState_Y();
+					const net = padPrim.getState_Net();
+					const pad = padPrim.getState_Pad();
+					const padRotation = padPrim.getState_Rotation();
+
+					const shape = Array.isArray(pad) && pad.length > 0 ? String(pad[0]) : 'UNKNOWN';
+
+					const rotationDeg = padRotation;
+
+					console.warn('[Fanout] ========== 选中焊盘 ==========');
+					console.warn(`[Fanout] 坐标 (mil): (${x}, ${y})`);
+					console.warn(`[Fanout] 坐标 (mm): ${formatPos(x, y)}`);
+					console.warn(`[Fanout] 形状: ${shape}`);
+					console.warn(`[Fanout] 焊盘旋转(弧度): ${padRotation}`);
+					console.warn(`[Fanout] 焊盘旋转(度数): ${rotationDeg.toFixed(2)}°`);
+					console.warn(`[Fanout] 网络: ${net || '(无)'}`);
+					console.warn('[Fanout] =============================');
+
+					fanoutState.selectedPadRotation = rotationDeg;
+
+					fanoutState.selectedPadPosition = { x, y };
+					fanoutState.selectedPadNet = net || null;
+					fanoutState.selectedPadShape = shape;
+					fanoutState.workState = 'PAD_SELECTED';
+					fanoutState.ignoreNextEmptyClick = true;
+					break;
 				}
 			}
 		}
@@ -187,26 +229,143 @@ async function handleMouseEvent(
 	}
 }
 
+const FANOUT_UNIT_MIL = 100;
+
+function getDirection8(dx: number, dy: number): { x: number; y: number } {
+	const absDx = Math.abs(dx);
+	const absDy = Math.abs(dy);
+	const threshold = 0.4142;
+
+	if (absDx >= absDy) {
+		if (absDx === 0)
+			return { x: 0, y: 0 };
+		const ratio = absDy / absDx;
+		if (ratio < threshold) {
+			return dx >= 0 ? { x: 1, y: 0 } : { x: -1, y: 0 };
+		}
+		else {
+			return dx >= 0
+				? (dy >= 0 ? { x: 1, y: 1 } : { x: 1, y: -1 })
+				: (dy >= 0 ? { x: -1, y: 1 } : { x: -1, y: -1 });
+		}
+	}
+	else {
+		if (absDy === 0)
+			return { x: 0, y: 0 };
+		const ratio = absDx / absDy;
+		if (ratio < threshold) {
+			return dy >= 0 ? { x: 0, y: 1 } : { x: 0, y: -1 };
+		}
+		else {
+			return dy >= 0
+				? (dx >= 0 ? { x: 1, y: 1 } : { x: -1, y: 1 })
+				: (dx >= 0 ? { x: 1, y: -1 } : { x: -1, y: -1 });
+		}
+	}
+}
+
+function toLocalCoordinates(dx: number, dy: number, rotation: number): { dxLocal: number; dyLocal: number } {
+	const rad = rotation * Math.PI / 180;
+	const cos = Math.cos(rad);
+	const sin = Math.sin(rad);
+
+	const dxLocal = dx * cos + dy * sin;
+	const dyLocal = -dx * sin + dy * cos;
+
+	return { dxLocal, dyLocal };
+}
+
+function getDirection4(dx: number, dy: number): { x: number; y: number } {
+	const absDx = Math.abs(dx);
+	const absDy = Math.abs(dy);
+
+	if (absDx >= absDy) {
+		return dx >= 0 ? { x: 1, y: 0 } : { x: -1, y: 0 };
+	}
+	else {
+		return dy >= 0 ? { x: 0, y: 1 } : { x: 0, y: -1 };
+	}
+}
+
+function getFanoutDirection(
+	dx: number,
+	dy: number,
+	padShape: string | null,
+	rotation: number | null,
+): { x: number; y: number } {
+	if (padShape === 'ELLIPSE') {
+		return getDirection8(dx, dy);
+	}
+
+	if (rotation !== null && rotation !== 0) {
+		const { dxLocal, dyLocal } = toLocalCoordinates(dx, dy, rotation);
+		return getDirection4(dxLocal, dyLocal);
+	}
+
+	return getDirection4(dx, dy);
+}
+
 function calculateViaPosition(
 	padPos: { x: number; y: number },
 	targetPos: { x: number; y: number },
 ): { x: number; y: number } {
 	const dx = targetPos.x - padPos.x;
 	const dy = targetPos.y - padPos.y;
-	const distance = Math.sqrt(dx * dx + dy * dy);
+	const rotation = fanoutState.selectedPadRotation;
 
-	if (distance < 0.001)
-		return padPos;
+	let dxLocal = dx;
+	let dyLocal = dy;
+	if (rotation !== null && rotation !== 0 && fanoutState.selectedPadShape !== 'ELLIPSE') {
+		({ dxLocal, dyLocal } = toLocalCoordinates(dx, dy, rotation));
+	}
 
-	const nx = dx / distance;
-	const ny = dy / distance;
+	const direction = getFanoutDirection(
+		dx,
+		dy,
+		fanoutState.selectedPadShape,
+		rotation,
+	);
 
-	const distanceMil = mmToMil(DEFAULT_FANOUT_DISTANCE_MM);
+	const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+	const directionName = getDirectionName(direction);
+
+	console.warn('[Fanout] ========== 方向计算 ==========');
+	console.warn(`[Fanout] 焊盘形状: ${fanoutState.selectedPadShape}`);
+	console.warn(`[Fanout] 焊盘旋转: ${rotation !== null ? `${rotation.toFixed(2)}°` : 'N/A'}`);
+	console.warn(`[Fanout] 鼠标向量 (mil): (${dx.toFixed(2)}, ${dy.toFixed(2)})`);
+	if (rotation !== null && rotation !== 0 && fanoutState.selectedPadShape !== 'ELLIPSE') {
+		console.warn(`[Fanout] 局部坐标 (mil): (${dxLocal.toFixed(2)}, ${dyLocal.toFixed(2)})`);
+	}
+	console.warn(`[Fanout] 鼠标角度: ${angle.toFixed(1)}°`);
+	console.warn(`[Fanout] 判定方向: ${directionName}`);
+	console.warn(`[Fanout] 方向向量: (${direction.x}, ${direction.y})`);
+	console.warn(`[Fanout] 扇出距离: ${FANOUT_UNIT_MIL} mil`);
+	console.warn('[Fanout] =============================');
 
 	return {
-		x: padPos.x + distanceMil * nx,
-		y: padPos.y + distanceMil * ny,
+		x: padPos.x + direction.x * FANOUT_UNIT_MIL,
+		y: padPos.y + direction.y * FANOUT_UNIT_MIL,
 	};
+}
+
+function getDirectionName(direction: { x: number; y: number }): string {
+	if (direction.x === 1 && direction.y === 0)
+		return 'E (右)';
+	if (direction.x === -1 && direction.y === 0)
+		return 'W (左)';
+	if (direction.x === 0 && direction.y === 1)
+		return 'S (下)';
+	if (direction.x === 0 && direction.y === -1)
+		return 'N (上)';
+	if (direction.x === 1 && direction.y === 1)
+		return 'SE (右下)';
+	if (direction.x === -1 && direction.y === 1)
+		return 'SW (左下)';
+	if (direction.x === 1 && direction.y === -1)
+		return 'NE (右上)';
+	if (direction.x === -1 && direction.y === -1)
+		return 'NW (左上)';
+	return 'UNKNOWN';
 }
 
 async function createFanout(targetPos: { x: number; y: number }): Promise<void> {
@@ -216,8 +375,14 @@ async function createFanout(targetPos: { x: number; y: number }): Promise<void> 
 	const viaPos = calculateViaPosition(fanoutState.selectedPadPosition, targetPos);
 	const net = fanoutState.selectedPadNet || '';
 
-	console.warn(`[Fanout] 创建扇出 - 焊盘(mil): (${fanoutState.selectedPadPosition.x}, ${fanoutState.selectedPadPosition.y})`);
-	console.warn(`[Fanout] 过孔(mil): (${viaPos.x}, ${viaPos.y})`);
+	console.warn('[Fanout] ========== 创建扇出 ==========');
+	console.warn(`[Fanout] 焊盘坐标 (mil): (${fanoutState.selectedPadPosition.x}, ${fanoutState.selectedPadPosition.y})`);
+	console.warn(`[Fanout] 焊盘坐标 (mm): ${formatPos(fanoutState.selectedPadPosition.x, fanoutState.selectedPadPosition.y)}`);
+	console.warn(`[Fanout] 过孔坐标 (mil): (${viaPos.x}, ${viaPos.y})`);
+	console.warn(`[Fanout] 过孔坐标 (mm): ${formatPos(viaPos.x, viaPos.y)}`);
+	console.warn(`[Fanout] 走线起点 (mil): (${fanoutState.selectedPadPosition.x}, ${fanoutState.selectedPadPosition.y})`);
+	console.warn(`[Fanout] 走线终点 (mil): (${viaPos.x}, ${viaPos.y})`);
+	console.warn('[Fanout] =============================');
 
 	try {
 		const viaResult = await eda.pcb_PrimitiveVia.create(
@@ -246,6 +411,7 @@ async function createFanout(targetPos: { x: number; y: number }): Promise<void> 
 		);
 
 		console.warn('[Fanout] 走线创建结果:', lineResult);
+		console.warn('[Fanout] ========== 扇出完成 ==========');
 
 		resetAfterFanout();
 		eda.sys_Message.showToastMessage('扇出成功', ESYS_ToastMessageType.INFO);
@@ -262,6 +428,8 @@ function resetState(): void {
 	fanoutState.workState = 'IDLE';
 	fanoutState.selectedPadPosition = null;
 	fanoutState.selectedPadNet = null;
+	fanoutState.selectedPadShape = null;
+	fanoutState.selectedPadRotation = null;
 	fanoutState.ignoreNextEmptyClick = false;
 }
 
@@ -270,6 +438,8 @@ function resetAfterFanout(): void {
 	fanoutState.workState = 'IDLE';
 	fanoutState.selectedPadPosition = null;
 	fanoutState.selectedPadNet = null;
+	fanoutState.selectedPadShape = null;
+	fanoutState.selectedPadRotation = null;
 	fanoutState.ignoreNextEmptyClick = false;
 }
 
@@ -286,6 +456,8 @@ function cancelFanout(): void {
 	fanoutState.workState = 'IDLE';
 	fanoutState.selectedPadPosition = null;
 	fanoutState.selectedPadNet = null;
+	fanoutState.selectedPadShape = null;
+	fanoutState.selectedPadRotation = null;
 	fanoutState.ignoreNextEmptyClick = false;
 	console.warn('[PadFanout] ==============================');
 }
