@@ -138,7 +138,22 @@ async function handleMouseEvent(
 	if (!fanoutState.isEnabled) {
 		return;
 	}
+	////
+	try {
+		// 先尝试将画布原点重置为 (0,0)
+		await eda.pcb_Document.setCanvasOrigin(0, 0);
+		console.warn('[Fanout] 已成功将画布原点重置为 (0, 0)');
 
+		const canvasOrigin = await eda.pcb_Document.getCanvasOrigin();
+		if (canvasOrigin) {
+			console.warn(`[Fanout] 画布原点 (mil): (${canvasOrigin.offsetX}, ${canvasOrigin.offsetY})`);
+			console.warn(`[Fanout] 画布原点 (mm): ${formatPos(canvasOrigin.offsetX, canvasOrigin.offsetY)}`);
+		}
+	}
+	catch (err) {
+		console.error('[Fanout] 获取画布原点失败:', err);
+	}
+	//////
 	if (!props || props.length === 0) {
 		console.warn('[Fanout] Props为空');
 		if (fanoutState.workState === 'PAD_SELECTED') {
@@ -197,7 +212,7 @@ async function handleMouseEvent(
 					const y = padPrim.getState_Y();
 					const net = padPrim.getState_Net();
 					const pad = padPrim.getState_Pad();
-					const padRotation = padPrim.getState_Rotation();
+					const padRotation = padPrim.getState_Rotation() * Math.PI / 180;
 
 					const shape = Array.isArray(pad) && pad.length > 0 ? String(pad[0]) : 'UNKNOWN';
 
@@ -207,8 +222,8 @@ async function handleMouseEvent(
 					console.warn(`[Fanout] 坐标 (mil): (${x}, ${y})`);
 					console.warn(`[Fanout] 坐标 (mm): ${formatPos(x, y)}`);
 					console.warn(`[Fanout] 形状: ${shape}`);
-					console.warn(`[Fanout] 焊盘旋转(弧度): ${padRotation}`);
-					console.warn(`[Fanout] 焊盘旋转(度数): ${rotationDeg.toFixed(2)}°`);
+					console.warn(`[Fanout] 焊盘旋转(度数): ${padRotation}`);
+					// console.warn(`[Fanout] 焊盘旋转(弧数): ${rotationDeg.toFixed(2)}°`);
 					console.warn(`[Fanout] 网络: ${net || '(无)'}`);
 					console.warn('[Fanout] =============================');
 
