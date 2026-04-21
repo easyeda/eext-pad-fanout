@@ -19,11 +19,20 @@ function formatPos(x: number, y: number): string {
 	return `(${milToMm(x).toFixed(4)} mm, ${milToMm(y).toFixed(4)} mm)`;
 }
 
-const DEFAULT_VIA_DIAMETER_MM = 0.6;
-const DEFAULT_HOLE_DIAMETER_MM = 0.3;
-const DEFAULT_LINE_WIDTH_MM = 0.254;
 const DEFAULT_VIA_TYPE = EPCB_PrimitiveViaType.VIA;
-const FANOUT_UNIT_MIL = 100;
+
+// 兜底默认值（PCB 规则读取失败时使用）
+const FALLBACK_VIA_DIAMETER_MIL = 23.622; // 0.6 mm
+const FALLBACK_HOLE_DIAMETER_MIL = 11.811; // 0.3 mm
+const FALLBACK_LINE_WIDTH_MIL = 10; // 0.254 mm
+const FALLBACK_LINE_LENGTH_MIL = 100;
+
+interface FanoutParams {
+	viaDiameterMil: number;
+	holeDiameterMil: number;
+	lineWidthMil: number;
+	lineLengthMil: number;
+}
 
 type WorkState = 'IDLE' | 'PAD_SELECTED';
 
@@ -44,6 +53,7 @@ interface FanoutState {
 	ignoreNextEmptyClick: boolean;
 	selectedPads: SelectedPadInfo[];
 	selectionMode: 'SINGLE' | 'MULTI' | null;
+	params: FanoutParams;
 }
 
 const fanoutState: FanoutState = {
@@ -56,6 +66,12 @@ const fanoutState: FanoutState = {
 	ignoreNextEmptyClick: false,
 	selectedPads: [],
 	selectionMode: null,
+	params: {
+		viaDiameterMil: FALLBACK_VIA_DIAMETER_MIL,
+		holeDiameterMil: FALLBACK_HOLE_DIAMETER_MIL,
+		lineWidthMil: FALLBACK_LINE_WIDTH_MIL,
+		lineLengthMil: FALLBACK_LINE_LENGTH_MIL,
+	},
 };
 
 const listenerId = 'pad-fanout-listener';
@@ -74,16 +90,17 @@ export function deactivate(): void {
 	console.warn(`[PadFanout] =================================`);
 }
 
-export function padFanout(): void {
+export async function padFanout(): Promise<void> {
 	console.warn('[PadFanout] ========== 启动工具 ==========');
 	console.warn('[PadFanout] padFanout() 被调用');
 
 	resetState();
+	await loadPCBRuleDefaults();
 	registerEventHandlers();
 	subscribeMessage();
 
 	console.warn('[PadFanout] 打开 iframe...');
-	eda.sys_IFrame.openIFrame('./iframe/index.html', 200, 290, 'pad-fanout-dialog', {
+	eda.sys_IFrame.openIFrame('./iframe/index.html', 200, 340, 'pad-fanout-dialog', {
 		buttonCallbackFn: (button) => {
 			console.warn('[PadFanout] iframe 按钮被点击:', button);
 			if (button === 'close') {
@@ -91,6 +108,9 @@ export function padFanout(): void {
 			}
 		},
 	});
+
+	// iframe 加载完成后推送初始参数
+	setTimeout(() => publishInitParams(), 500);
 
 	console.warn('[PadFanout] ============================');
 }
@@ -118,6 +138,13 @@ function subscribeMessage(): void {
 		console.warn('[PadFanout] 收到 MessageBus 消息:', message);
 		if (message && message.action) {
 			if (message.action === 'enable') {
+				if (message.params) {
+					fanoutState.params.viaDiameterMil = mmToMil(message.params.viaDiameter);
+					fanoutState.params.holeDiameterMil = mmToMil(message.params.holeDiameter);
+					fanoutState.params.lineWidthMil = mmToMil(message.params.lineWidth);
+					fanoutState.params.lineLengthMil = mmToMil(message.params.lineLength);
+					console.warn('[PadFanout] 参数已更新:', fanoutState.params);
+				}
 				enableFanout();
 			}
 			else if (message.action === 'cancel') {
@@ -126,6 +153,47 @@ function subscribeMessage(): void {
 		}
 	});
 	console.warn('[PadFanout] MessageBus 订阅成功');
+}
+
+async function loadPCBRuleDefaults(): Promise<void> {
+	try {
+		const config = await eda.pcb_Drc.getCurrentRuleConfiguration();
+		const physics = (config as any)?.config?.Physics;
+		if (!physics) {
+			console.warn('[PadFanout] 未找到 Physics 规则，使用兜底默认值');
+			return;
+		}
+
+		const viaForm = physics['Via Size']?.viaSize?.form;
+		if (viaForm?.viaOuterdiameterDefault && viaForm?.viaInnerdiameterDefault) {
+			fanoutState.params.viaDiameterMil = viaForm.viaOuterdiameterDefault;
+			fanoutState.params.holeDiameterMil = viaForm.viaInnerdiameterDefault;
+			console.warn(`[PadFanout] 过孔规则: 外径=${fanoutState.params.viaDiameterMil} mil, 孔径=${fanoutState.params.holeDiameterMil} mil`);
+		}
+
+		const trackRules = physics.Track;
+		if (trackRules) {
+			const defaultRule = Object.values(trackRules).find((r: any) => r.isSetDefault) as any;
+			const defaultWidth = defaultRule?.form?.data?.['1']?.defaultValue;
+			if (defaultWidth) {
+				fanoutState.params.lineWidthMil = defaultWidth;
+				console.warn(`[PadFanout] 走线规则: 线宽=${fanoutState.params.lineWidthMil} mil`);
+			}
+		}
+	}
+	catch (err) {
+		console.warn('[PadFanout] 读取 PCB 规则失败，使用兜底默认值:', err);
+	}
+}
+
+function publishInitParams(): void {
+	eda.sys_MessageBus.publishPublic('pad-fanout-init', {
+		viaDiameter: milToMm(fanoutState.params.viaDiameterMil),
+		holeDiameter: milToMm(fanoutState.params.holeDiameterMil),
+		lineWidth: milToMm(fanoutState.params.lineWidthMil),
+		lineLength: milToMm(fanoutState.params.lineLengthMil),
+	});
+	console.warn('[PadFanout] 已推送初始参数到 iframe');
 }
 
 function unsubscribeMessage(): void {
@@ -468,10 +536,10 @@ function calculateViaPosition(
 	console.warn(`[Fanout] 鼠标角度: ${angle.toFixed(1)}°`);
 	console.warn(`[Fanout] 判定方向: ${directionName}`);
 	console.warn(`[Fanout] 方向向量: (${direction.x}, ${direction.y})`);
-	console.warn(`[Fanout] 扇出距离: ${FANOUT_UNIT_MIL} mil`);
+	console.warn(`[Fanout] 扇出距离: ${fanoutState.params.lineLengthMil} mil`);
 	console.warn('[Fanout] =============================');
 
-	const localDir = { x: direction.x * FANOUT_UNIT_MIL, y: direction.y * FANOUT_UNIT_MIL };
+	const localDir = { x: direction.x * fanoutState.params.lineLengthMil, y: direction.y * fanoutState.params.lineLengthMil };
 	const rad = (rotation ?? 0) * Math.PI / 180;
 	const cos = Math.cos(rad);
 	const sin = Math.sin(rad);
@@ -518,13 +586,16 @@ async function createFanout(targetPos: { x: number; y: number }): Promise<void> 
 	console.warn(`[Fanout] 走线终点 (mil): (${viaPos.x}, ${viaPos.y})`);
 	console.warn('[Fanout] =============================');
 
+	console.warn(`[Fanout] 过孔外径: ${fanoutState.params.viaDiameterMil} mil, 孔径: ${fanoutState.params.holeDiameterMil} mil`);
+	console.warn(`[Fanout] 走线宽度: ${fanoutState.params.lineWidthMil} mil`);
+
 	try {
 		const viaResult = await eda.pcb_PrimitiveVia.create(
 			net,
 			viaPos.x,
 			viaPos.y,
-			mmToMil(DEFAULT_HOLE_DIAMETER_MM),
-			mmToMil(DEFAULT_VIA_DIAMETER_MM),
+			fanoutState.params.holeDiameterMil,
+			fanoutState.params.viaDiameterMil,
 			DEFAULT_VIA_TYPE,
 			undefined,
 			undefined,
@@ -540,7 +611,7 @@ async function createFanout(targetPos: { x: number; y: number }): Promise<void> 
 			fanoutState.selectedPadPosition.y,
 			viaPos.x,
 			viaPos.y,
-			mmToMil(DEFAULT_LINE_WIDTH_MM),
+			fanoutState.params.lineWidthMil,
 			false,
 		);
 
