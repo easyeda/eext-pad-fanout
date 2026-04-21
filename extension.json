@@ -1,9 +1,9 @@
 {
-	"name": "pad-fanout",
+	"name": "单焊盘扇出过孔",
 	"uuid": "448d530c15214d55b1addae1af2ff06f",
-	"displayName": "Pad Fanout",
+	"displayName": "单焊盘扇出",
 	"description": "单焊盘扇出过孔插件",
-	"version": "1.3.0",
+	"version": "1.5.0",
 	"publisher": "",
 	"engines": {
 		"eda": "^3.0.0"

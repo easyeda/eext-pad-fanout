@@ -23,6 +23,7 @@ const DEFAULT_VIA_DIAMETER_MM = 0.6;
 const DEFAULT_HOLE_DIAMETER_MM = 0.3;
 const DEFAULT_LINE_WIDTH_MM = 0.254;
 const DEFAULT_VIA_TYPE = EPCB_PrimitiveViaType.VIA;
+const FANOUT_UNIT_MIL = 100;
 
 type WorkState = 'IDLE' | 'PAD_SELECTED';
 
@@ -349,8 +350,6 @@ async function handleMouseEvent(
 		fanoutState.ignoreNextEmptyClick = false;
 	}
 }
-
-const FANOUT_UNIT_MIL = 100;
 
 function getDirection8(dx: number, dy: number): { x: number; y: number } {
 	const absDx = Math.abs(dx);
