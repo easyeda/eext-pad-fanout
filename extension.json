@@ -2,9 +2,9 @@
 	"name": "eext-pad-fanout",
 	"uuid": "448d530c15214d55b1addae1af2ff06f",
 	"displayName": "焊盘扇出",
-	"description": "焊盘扇出过孔插件",
+	"description": "能够快速对焊盘进行过孔扇出，提升工作效率",
 	"version": "2.3.1",
-	"publisher": "",
+	"publisher": "EasyEDA",
 	"engines": {
 		"eda": "^3.0.0"
 	},
@@ -15,7 +15,7 @@
 	},
 	"categories": "PCB",
 	"keywords": [
-		"SDK,pcb"
+		"Fanout","扇出“
 	],
 	"images": {
 		"logo": "./images/logo.png"
