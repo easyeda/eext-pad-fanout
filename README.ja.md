@@ -1,43 +1,59 @@
 [简体中文](./README.md) | [English](./README.en.md) | [繁體中文](./README.zh-Hant.md) | [日本語](#) | [Русский](./README.ru.md)
 
-# pro-api-sdk
+# パッド扇出
 
-嘉立创EDA & EasyEDA Pro Edition は API 開発ツールを拡張します
+嘉立創EDA プロ版 PCB パッド扇出ビアプラグイン v2.3.1
 
-<a href="https://github.com/easyeda/pro-api-sdk" style="vertical-align: inherit;" target="_blank"><img src="https://img.shields.io/github/stars/easyeda/pro-api-sdk" alt="GitHub Repo Stars" class="not-medium-zoom-image" style="display: inline; vertical-align: inherit;" /></a>&nbsp;<a href="https://github.com/easyeda/pro-api-sdk/issues" style="vertical-align: inherit;" target="_blank"><img src="https://img.shields.io/github/issues/easyeda/pro-api-sdk" alt="GitHub Issues" class="not-medium-zoom-image" style="display: inline; vertical-align: inherit;" /></a>&nbsp;<a href="https://github.com/easyeda/pro-api-sdk" style="vertical-align: inherit;" target="_blank"><img src="https://img.shields.io/github/repo-size/easyeda/pro-api-sdk" alt="GitHub Repo Size" class="not-medium-zoom-image" style="display: inline; vertical-align: inherit;" /></a>&nbsp;<a href="https://choosealicense.com/licenses/apache-2.0/" style="vertical-align: inherit;" target="_blank"><img src="https://img.shields.io/github/license/easyeda/pro-api-sdk" alt="GitHub License" class="not-medium-zoom-image" style="display: inline; vertical-align: inherit;" /></a>&nbsp;<a href="https://www.npmjs.com/package/@jlceda/pro-api-types" style="vertical-align: inherit;" target="_blank"><img src="https://img.shields.io/npm/v/%40jlceda%2Fpro-api-types?label=pro-api-types" alt="NPM Version" class="not-medium-zoom-image" style="display: inline; vertical-align: inherit;" /></a>&nbsp;<a href="https://www.npmjs.com/package/@jlceda/pro-api-types" style="vertical-align: inherit;" target="_blank"><img src="https://img.shields.io/npm/d18m/%40jlceda%2Fpro-api-types" alt="NPM Downloads" class="not-medium-zoom-image" style="display: inline; vertical-align: inherit;" /></a>
+## 概要
 
-> [!NOTE]
->
-> 詳細な開発ドキュメントについては、以下をご覧ください：[https://prodocs.easyeda.com/en/api/guide/](https://prodocs.easyeda.com/en/api/guide/)
+PCB 設計において、選択したパッドに対して自動的に扇出用のビアと配線を作成します。
 
-## 開発に入る
+**主な機能：**
 
-この開発ツールセットには、[EasyEDA Pro Edition](https://pro.easyeda.com/) 拡張パッケージを開発するためのすべての環境とツールが含まれており、ESLint の推奨ルールが組み込まれています。
+- **単一パッド扇出**：単一のパッドを選択し、方向キーで扇出を実行します
+- **一括扇出**：複数のパッドを範囲選択して同一方向で一括扇出。パッド番号順に処理されます
+- **方向キー扇出**：UI は 8 方向キーを提供。円形パッドは 8 方向、その他の形状は 4 方向をサポートします
+- **カーソル扇出**：カーソル扇出モードを有効にすると、キャンバスの空白をクリックして方向を自動判定し扇出します
+- **ブラインド/埋設ビア対応**：PCB 設計ルールからブラインド/埋設ビアの設定を自動読み取り、スルーホール/ブラインド/埋設の選択をサポートします
+- **ルール追従**：起動時に PCB 設計ルールのビア寸法と配線幅を既定値として読み取り、mm/mil の単位自動判別と単位切替に対応します
+- **参差扇出**：複数パッド選択時に参差長を設定でき、隣接パッドが交互に異なる扇出長を使用します
+- **回転パッド対応**：非円形パッドに回転がある場合、方向キーはパッドのローカル座標系の方向に対応します
 
-1. プロジェクト [pro-api-sdk](https://github.com/easyeda/pro-api-sdk) リポジトリをローカル コンピューターにクローンします
+## 使用方法
 
-    ```shell
-    git clone --depth=1 https://github.com/easyeda/pro-api-sdk.git
-    ```
+1. EDA の上部メニューで **焊盘扇出** → **焊盘扇出…** を選んでプラグインを起動します
+2. PCB キャンバスでパッドを単独選択または範囲選択します
+3. UI パネルの方向キーをクリックして扇出を実行、または「カーソル扇出」を有効にしてキャンバスの空白をクリックします
+4. UI パネルで調整可能なパラメータ：
+   - ビアタイプ（スルーホール / ブラインド / 埋設）
+   - ビア外径、ドリル径（mm）
+   - トレース幅、トレース長（mm）
+   - 参差長（mm、バッチ扇出時に隣接パッドで交互に使用）
+5. 「↺ リフレッシュ」をクリックして現在の PCB 設計ルールを再読み込みします
+![alt text](企业微信截图_17769280433269.png)
 
-2. 開発環境の初期化 (依存関係のインストール)
+## 注意事項
 
-    ```shell
-    npm install
-    ```
+- 非円形パッドに回転がある場合、方向キーはパッドのローカル座標系の方向に対応し、キャンバスのグローバル方向には対応しません
+- 斜め方向キー（↖↗↙↘）は円形パッドのみ対応し、矩形などのパッドではサポートされない旨の警告が表示されます
+- 複数パッドを範囲選択した場合、カーソル扇出はマウスに最も近いパッドを基準原点として方向を判定します
 
-3. いくつかの変更を加えます...
+## ビルド
 
-4. 拡張機能パッケージをコンパイルする
+```shell
+npm install          # 依存関係をインストール
+npm run compile      # TypeScript をコンパイル → dist/index.js
+npm run build        # コンパイル + パッケージ → build/dist/*.eext
+npm run lint         # ESLint チェック
+npm run fix          # ESLint 自動修正
+```
 
-    ```shell
-    npm run build
-    ```
+生成物 `.eext` は `build/dist/` にあり、EDA 拡張マネージャーからインポートして使用できます。
 
-5. EasyEDA Pro Edition の `./build/dist/` の下に生成された拡張パッケージをインストールします
+## インストール
 
-## オープンソースライセンス
+EDA プロ版 V3：上部メニュー → 高度設定 → 拡張マネージャー… → インポート
 
-<a href="https://choosealicense.com/licenses/apache-2.0/" style="vertical-align: inherit;" target="_blank"><img src="https://img.shields.io/github/license/easyeda/pro-api-sdk" alt="GitHub License" class="not-medium-zoom-image" style="display: inline; vertical-align: inherit;" /></a>
+## ライセンス
 
-この開発ツールグループは、[Apache License 2.0](https://choosealicense.com/licenses/apache-2.0/) オープンソースライセンス契約を使用しており、このツールグループに基づいて開発された拡張パッケージの **機能説明部分** および **オープンソースリリースタイトル部分** の **嘉立创EDA**、**EasyEDA** 商標情報のみを使用することができます。
+[Apache License 2.0](https://choosealicense.com/licenses/apache-2.0/)

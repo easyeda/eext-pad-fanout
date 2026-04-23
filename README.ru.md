@@ -1,43 +1,59 @@
 [简体中文](./README.md) | [English](./README.en.md) | [繁體中文](./README.zh-Hant.md) | [日本語](./README.ja.md) | [Русский](#)
 
-# pro-api-sdk
+# Фан-аут контактных площадок
 
-嘉立创EDA & EasyEDA Pro Edition Расширьте возможности инструментов разработки API
+Плагин для JLCEDA Pro — Pad Fanout (создание переходных отверстий) v2.3.1
 
-<a href="https://github.com/easyeda/pro-api-sdk" style="vertical-align: inherit;" target="_blank"><img src="https://img.shields.io/github/stars/easyeda/pro-api-sdk" alt="GitHub Repo Stars" class="not-medium-zoom-image" style="display: inline; vertical-align: inherit;" /></a>&nbsp;<a href="https://github.com/easyeda/pro-api-sdk/issues" style="vertical-align: inherit;" target="_blank"><img src="https://img.shields.io/github/issues/easyeda/pro-api-sdk" alt="GitHub Issues" class="not-medium-zoom-image" style="display: inline; vertical-align: inherit;" /></a>&nbsp;<a href="https://github.com/easyeda/pro-api-sdk" style="vertical-align: inherit;" target="_blank"><img src="https://img.shields.io/github/repo-size/easyeda/pro-api-sdk" alt="GitHub Repo Size" class="not-medium-zoom-image" style="display: inline; vertical-align: inherit;" /></a>&nbsp;<a href="https://choosealicense.com/licenses/apache-2.0/" style="vertical-align: inherit;" target="_blank"><img src="https://img.shields.io/github/license/easyeda/pro-api-sdk" alt="GitHub License" class="not-medium-zoom-image" style="display: inline; vertical-align: inherit;" /></a>&nbsp;<a href="https://www.npmjs.com/package/@jlceda/pro-api-types" style="vertical-align: inherit;" target="_blank"><img src="https://img.shields.io/npm/v/%40jlceda%2Fpro-api-types?label=pro-api-types" alt="NPM Version" class="not-medium-zoom-image" style="display: inline; vertical-align: inherit;" /></a>&nbsp;<a href="https://www.npmjs.com/package/@jlceda/pro-api-types" style="vertical-align: inherit;" target="_blank"><img src="https://img.shields.io/npm/d18m/%40jlceda%2Fpro-api-types" alt="NPM Downloads" class="not-medium-zoom-image" style="display: inline; vertical-align: inherit;" /></a>
+## Описание
 
-> [!NOTE]
->
-> Для получения подробной документации по разработке, пожалуйста, посетите: [https://prodocs.easyeda.com/en/api/guide/](https://prodocs.easyeda.com/en/api/guide/)
+Автоматически создаёт фан-аут переходных отверстий (vias) и трассы для выбранных контактных площадок в проекте PCB.
 
-## Войти в разработку
+**Основные возможности:**
 
-Этот набор инструментов разработки содержит все среды и инструменты для разработки пакета расширений [EasyEDA Pro Edition](https://pro.easyeda.com/), а также имеет встроенные рекомендуемые правила для ESLint.
+- **Фан-аут одиночной площадки**: выберите одну площадку и выполните фан-аут с помощью клавиш направления.
+- **Пакетный фан-аут**: выделите рамкой несколько площадок и выполните фан-аут в одном направлении; обработка выполняется в порядке нумерации площадок.
+- **Фан-аут клавишами направления**: интерфейс предоставляет 8 направлений; круглые площадки поддерживают 8 направлений, другие формы — 4 направления.
+- **Фан-аут по курсору**: при включённом режиме "Cursor Fanout" клик по пустому месту на холсте автоматически определяет направление и выполняет фан-аут.
+- **Поддержка слепых/вкладываемых переходов (blind/buried)**: автоматически считывает настройки из правил PCB; поддерживается выбор сквозных/слепых/вкладываемых переходов.
+- **Следование правилам проекта**: при запуске плагин считывает размеры via и ширину трасс из правил PCB как значения по умолчанию; поддерживается автоматическое определение единиц (mm/mil) и переключение единиц.
+- **Чередующийся (ступенчатый) фан-аут**: при выделении нескольких площадок можно задать длину чередования, чтобы соседние площадки поочерёдно использовали разные длины фан-аута.
+- **Поддержка повернутых площадок**: для некруглых площадок с углом поворота клавиши направления соответствуют локальной системе координат площадки.
 
-1. Клонируйте репозиторий проекта [pro-api-sdk](https://github.com/easyeda/pro-api-sdk) на свой локальный компьютер
+## Использование
 
-    ```shell
-    git clone --depth=1 https://github.com/easyeda/pro-api-sdk.git
-    ```
+1. Запустите плагин из верхнего меню EDA: **Pad Fanout** → **Pad Fanout...**
+2. Выберите или выделите рамкой площадки на холсте PCB.
+3. Нажмите кнопки направления в панели UI, чтобы выполнить фан-аут; либо включите "Cursor Fanout" и кликните по пустому месту на холсте.
+4. Настраиваемые параметры в панели UI:
+   - Тип перехода (сквозной / blind / buried)
+   - Внешний диаметр via и диаметр сверления (мм)
+   - Ширина трассы и длина трассы (мм)
+   - Длина чередования (мм — используется для поочерёдного изменения длины при пакетном фан-аутах)
+5. Нажмите «↺ Refresh» для повторного чтения текущих правил PCB.
+![alt text](企业微信截图_17769280433269.png)
 
-2. Инициализация среды разработки (установка зависимостей)
+## Примечания
 
-    ```shell
-    npm install
-    ```
+- Для некруглых площадок с углом поворота клавиши направления соответствуют локальной системе координат площадки, а не глобальной системе холста.
+- Диагональные клавиши направления (↖↗↙↘) работают только для круглых площадок; для прямоугольных площадок будет отображаться сообщение о неподдержке.
+- При выделении нескольких площадок курсорный фан-аут определяет направление относительно площадки, ближайшей к курсору, принимая её за опорную точку.
 
-3. Внесите несколько изменений...
+## Сборка
 
-4. Компиляция пакета расширения
+```shell
+npm install          # установить зависимости
+npm run compile      # скомпилировать TypeScript → dist/index.js
+npm run build        # скомпилировать + упаковать → build/dist/*.eext
+npm run lint         # проверка ESLint
+npm run fix          # автоисправление ESLint
+```
 
-    ```shell
-    npm run build
-    ```
+Файл сборки `.eext` находится в `build/dist/` и может быть импортирован в Диспетчер расширений EDA.
 
-5. Установите пакет расширения, сгенерированный в разделе `./build/dist/` в EasyEDA Pro Edition
+## Установка
 
-## Лицензия с открытым исходным кодом
+EDA Pro V3: Верхнее меню → Advanced → Extension Manager… → Import
 
-<a href="https://choosealicense.com/licenses/apache-2.0/" style="vertical-align: inherit;" target="_blank"><img src="https://img.shields.io/github/license/easyeda/pro-api-sdk" alt="GitHub License" class="not-medium-zoom-image" style="display: inline; vertical-align: inherit;" /></a>
+## Лицензия
 
-Эта группа инструментов разработки использует лицензионное соглашение с открытым исходным кодом [Apache License 2.0](https://choosealicense.com/licenses/apache-2.0/), и вы можете использовать только информацию о товарном знаке **嘉立创EDA**, **EasyEDA** для **части описания функции** и **части названия выпуска с открытым исходным кодом** пакета расширений, разработанного на основе этой группы инструментов.
+[Apache License 2.0](https://choosealicense.com/licenses/apache-2.0/)

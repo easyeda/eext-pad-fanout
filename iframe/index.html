@@ -4,236 +4,308 @@
 	<meta charset="UTF-8">
 	<style>
 		* { margin: 0; padding: 0; box-sizing: border-box; }
-		body {
-			font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-			background: transparent;
-		}
-		.fanout-panel {
-			width: 200px;
+		html, body {
+			width: 100%;
 			background: #1e1e1e;
-			border: 1px solid #3a3a3a;
-			border-radius: 8px;
-			box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+			font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 			overflow: hidden;
 		}
-		.panel-header {
-			background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-			color: #fff;
-			padding: 10px 14px;
-			display: flex;
-			align-items: center;
-			gap: 8px;
-		}
-		.panel-header svg {
-			width: 16px;
-			height: 16px;
-		}
-		.panel-header h3 {
-			font-size: 12px;
-			font-weight: 600;
-			margin: 0;
-		}
-		.panel-content {
-			padding: 12px;
-		}
-		.status-badge {
+		.panel-content { padding: 7px 10px; }
+		.top-bar {
 			display: flex;
 			align-items: center;
 			justify-content: space-between;
-			background: #2d2d2d;
-			border-radius: 4px;
-			padding: 8px 10px;
-			margin-bottom: 10px;
+			margin-bottom: 6px;
 		}
-		.status-label {
-			font-size: 10px;
-			color: #888;
+		.unit-toggle {
+			display: flex;
+			background: #2a2a2a;
+			border: 1px solid #555;
+			border-radius: 3px;
+			overflow: hidden;
 		}
-		.status-value {
-			font-size: 10px;
-			font-weight: 600;
-			padding: 2px 6px;
-			border-radius: 8px;
-		}
-		.status-value.inactive { background: #3d3d3d; color: #666; }
-		.status-value.active { background: #4caf50; color: #fff; }
-		.form-group { margin-bottom: 8px; }
-		.form-group label {
-			display: block;
-			font-size: 10px;
-			color: #888;
-			margin-bottom: 4px;
-		}
-		.form-group select,
-		.form-group input {
-			width: 100%;
-			padding: 6px 8px;
-			background: #2d2d2d;
-			border: 1px solid #404040;
-			border-radius: 4px;
-			color: #e0e0e0;
-			font-size: 11px;
-		}
-		.btn-primary {
-			width: 100%;
-			padding: 8px 12px;
-			background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-			border: none;
-			border-radius: 4px;
-			color: #fff;
-			font-size: 11px;
-			font-weight: 600;
-			cursor: pointer;
-			margin-top: 4px;
-		}
-		.btn-secondary { background: #3d3d3d; color: #aaa; }
-		.panel-footer {
-			padding: 10px 12px;
-			background: #252525;
-			border-top: 1px solid #3a3a3a;
-		}
-		.hints {
-			font-size: 9px;
-			color: #666;
-			line-height: 1.5;
-		}
-		.hints .key {
-			background: #3d3d3d;
-			padding: 1px 4px;
-			border-radius: 2px;
+		.unit-btn {
+			padding: 2px 8px;
+			font-size: 12px;
 			color: #aaa;
+			background: none;
+			border: none;
+			cursor: pointer;
+		}
+		.unit-btn.active { background: #667eea; color: #fff; }
+		.btn-refresh {
+			background: none;
+			border: 1px solid #555;
+			border-radius: 3px;
+			color: #fff;
+			font-size: 12px;
+			padding: 2px 8px;
+			cursor: pointer;
+			line-height: 1;
+		}
+		.btn-refresh:hover { background: #2a2a2a; }
+		.form-row {
+			display: flex;
+			align-items: center;
+			margin-bottom: 4px;
+			gap: 5px;
+		}
+		.form-row label {
+			font-size: 13px;
+			color: #fff;
+			width: 72px;
+			flex-shrink: 0;
+		}
+		.form-row select,
+		.form-row input {
+			flex: 1;
+			padding: 2px 5px;
+			background: #2a2a2a;
+			border: 1px solid #555;
+			border-radius: 3px;
+			color: #fff;
+			font-size: 13px;
+			min-width: 0;
+		}
+		.form-row input[type=number] { text-align: right; }
+		.toggle-row {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			margin-bottom: 6px;
+			margin-top: 2px;
+		}
+		.toggle-label { font-size: 13px; color: #fff; }
+		.toggle-switch { position: relative; display: inline-block; width: 36px; height: 20px; }
+		.toggle-switch input { opacity: 0; width: 0; height: 0; }
+		.toggle-slider {
+			position: absolute; cursor: pointer; inset: 0;
+			background: #3a3a3a; border-radius: 20px;
+			transition: 0.2s;
+		}
+		.toggle-slider:before {
+			content: ''; position: absolute;
+			width: 14px; height: 14px; left: 3px; bottom: 3px;
+			background: #aaa; border-radius: 50%; transition: 0.2s;
+		}
+		.toggle-switch input:checked + .toggle-slider { background: #667eea; }
+		.toggle-switch input:checked + .toggle-slider:before { transform: translateX(16px); background: #fff; }
+		.dir-section { margin-top: 5px; }
+		.dir-label { font-size: 12px; color: #fff; margin-bottom: 3px; }
+		.dir-grid {
+			display: grid;
+			grid-template-columns: repeat(3, 1fr);
+			gap: 3px;
+		}
+		.btn-dir {
+			padding: 6px 0;
+			background: #2a2a2a;
+			border: 1px solid #667eea;
+			border-radius: 3px;
+			color: #fff;
+			font-size: 15px;
+			cursor: pointer;
+			text-align: center;
+			line-height: 1;
+			transition: background 0.1s;
+		}
+		.btn-dir:hover { background: #3a3a3a; }
+		.btn-dir:active { background: #667eea; }
+		.dir-placeholder { background: transparent; }
+		.dir-note {
+			font-size: 9px;
+			color: #ccc;
+			margin-top: 4px;
+			line-height: 1.4;
 		}
 	</style>
 </head>
 <body>
-	<div class="fanout-panel">
-		<div class="panel-header">
-			<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-				<circle cx="12" cy="12" r="3"/>
-				<path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4"/>
-			</svg>
-			<h3>单焊盘扇出</h3>
+	<div class="panel-content">
+		<div class="top-bar">
+			<div class="unit-toggle">
+				<button class="unit-btn active" id="unit-mm" onclick="setUnit('mm')">mm</button>
+				<button class="unit-btn" id="unit-mil" onclick="setUnit('mil')">mil</button>
+			</div>
+			<button class="btn-refresh" onclick="doRefresh()" title="刷新PCB规则">↺ 刷新</button>
 		</div>
 
-		<div class="panel-content">
-			<div class="status-badge">
-				<span class="status-label">状态</span>
-				<span class="status-value inactive" id="status-value">未启用</span>
-			</div>
-
-			<div class="form-group">
-				<label>过孔类型</label>
-				<select id="via-type">
-					<option value="through">通孔</option>
-					<option value="blind_1_2">盲孔 1-2</option>
-					<option value="blind_1_3">盲孔 1-3</option>
-				</select>
-			</div>
-
-			<div class="form-group">
-				<label>过孔外径 (mm)</label>
-				<input type="number" id="via-outer" value="0.610" step="0.001" min="0.1" max="10">
-			</div>
-			<div class="form-group">
-				<label>孔径 (mm)</label>
-				<input type="number" id="via-inner" value="0.305" step="0.001" min="0.1" max="10">
-			</div>
-			<div class="form-group">
-				<label>线宽 (mm)</label>
-				<input type="number" id="line-width" value="0.254" step="0.001" min="0.01" max="10">
-			</div>
-			<div class="form-group">
-				<label>线长 (mm)</label>
-				<input type="number" id="line-length" value="2.540" step="0.001" min="0.1" max="50">
-			</div>
-
-			<button class="btn-primary" id="btn-toggle" onclick="toggleMode()">启用扇出</button>
-			<button class="btn-primary btn-secondary" id="btn-cancel" style="display:none; margin-top:4px;" onclick="cancelFanout()">取消</button>
+		<div class="form-row">
+			<label>过孔类型</label>
+			<select id="via-type">
+				<option value="0">通孔</option>
+			</select>
+		</div>
+		<div class="form-row">
+			<label>外径</label>
+			<input type="number" id="via-outer" value="0.610" step="0.001" min="0.001" max="100">
+		</div>
+		<div class="form-row">
+			<label>孔径</label>
+			<input type="number" id="via-inner" value="0.305" step="0.001" min="0.001" max="100">
+		</div>
+		<div class="form-row">
+			<label>线宽</label>
+			<input type="number" id="line-width" value="0.254" step="0.001" min="0.001" max="100">
+		</div>
+		<div class="form-row">
+			<label>线长</label>
+			<input type="number" id="line-length" value="2.540" step="0.001" min="0.001" max="1000">
+		</div>
+		<div class="form-row">
+			<label>参差</label>
+			<input type="number" id="stagger-length" value="0.000" step="0.001" min="0" max="1000">
 		</div>
 
-		<div class="panel-footer">
-			<div class="hints">
-				<div><span class="key">LMB</span> 确认扇出 | <span class="key">RMB</span>/<span class="key">ESC</span> 取消</div>
+		<div class="toggle-row">
+			<span class="toggle-label">光标扇出</span>
+			<label class="toggle-switch">
+				<input type="checkbox" id="cursor-toggle" onchange="onCursorToggle()">
+				<span class="toggle-slider"></span>
+			</label>
+		</div>
+
+		<div class="dir-section">
+			<div class="dir-label">扇出方向</div>
+			<div class="dir-grid">
+				<button class="btn-dir" onclick="clickDir(-1,1)">↖</button>
+				<button class="btn-dir" onclick="clickDir(0,1)">↑</button>
+				<button class="btn-dir" onclick="clickDir(1,1)">↗</button>
+				<button class="btn-dir" onclick="clickDir(-1,0)">←</button>
+				<div class="dir-placeholder"></div>
+				<button class="btn-dir" onclick="clickDir(1,0)">→</button>
+				<button class="btn-dir" onclick="clickDir(-1,-1)">↙</button>
+				<button class="btn-dir" onclick="clickDir(0,-1)">↓</button>
+				<button class="btn-dir" onclick="clickDir(1,-1)">↘</button>
 			</div>
+			<div class="dir-note">注意：非圆形焊盘有旋转角时，方向为焊盘局部坐标方向</div>
 		</div>
 	</div>
 
 	<script>
-		var isEnabled = false;
-		function sendMessage(action) {
-			console.warn('[IFrame] 发送 MessageBus 消息, action:', action);
-			if (typeof eda !== 'undefined' && eda.sys_MessageBus) {
-				eda.sys_MessageBus.publishPublic('pad-fanout-action', { action: action });
-				console.warn('[IFrame] MessageBus 消息已发送 (publishPublic)');
+		var currentUnit = 'mm';
+
+		function mmToMil(v) { return v * 39.3701; }
+		function milToMm(v) { return v / 39.3701; }
+
+		function setUnit(unit) {
+			if (unit === currentUnit) return;
+			var ids = ['via-outer', 'via-inner', 'line-width', 'line-length', 'stagger-length'];
+			ids.forEach(function(id) {
+				var el = document.getElementById(id);
+				var val = parseFloat(el.value) || 0;
+				if (unit === 'mil') {
+					el.value = mmToMil(val).toFixed(2);
+					el.step = '0.1';
+				} else {
+					el.value = milToMm(val).toFixed(3);
+					el.step = '0.001';
+				}
+			});
+			currentUnit = unit;
+			document.getElementById('unit-mm').className = 'unit-btn' + (unit === 'mm' ? ' active' : '');
+			document.getElementById('unit-mil').className = 'unit-btn' + (unit === 'mil' ? ' active' : '');
+		}
+
+		function getValueMm(id) {
+			var val = parseFloat(document.getElementById(id).value) || 0;
+			return currentUnit === 'mil' ? milToMm(val) : val;
+		}
+
+		function setValueFromMm(id, mmVal) {
+			var el = document.getElementById(id);
+			if (currentUnit === 'mil') {
+				el.value = mmToMil(mmVal).toFixed(2);
+				el.step = '0.1';
 			} else {
-				console.warn('[IFrame] eda 或 sys_MessageBus 不可用');
+				el.value = mmVal.toFixed(3);
+				el.step = '0.001';
 			}
 		}
-		function sendEnableWithParams() {
-			var params = {
-				viaDiameter: parseFloat(document.getElementById('via-outer').value) || 0.61,
-				holeDiameter: parseFloat(document.getElementById('via-inner').value) || 0.305,
-				lineWidth: parseFloat(document.getElementById('line-width').value) || 0.254,
-				lineLength: parseFloat(document.getElementById('line-length').value) || 2.54
+
+		function clickDir(dx, dy) {
+			if (typeof eda !== 'undefined' && eda.sys_MessageBus) {
+				eda.sys_MessageBus.publishPublic('pad-fanout-direction', { dx: dx, dy: dy });
+			}
+		}
+
+		function onCursorToggle() {
+			var enabled = document.getElementById('cursor-toggle').checked;
+			if (typeof eda !== 'undefined' && eda.sys_MessageBus) {
+				eda.sys_MessageBus.publishPublic('pad-fanout-cursor-toggle', { enabled: enabled });
+			}
+		}
+
+		function doRefresh() {
+			if (typeof eda !== 'undefined' && eda.sys_MessageBus) {
+				eda.sys_MessageBus.publishPublic('pad-fanout-refresh', {});
+			}
+		}
+
+		function sendParamsUpdate() {
+			if (typeof eda === 'undefined' || !eda.sys_MessageBus) return;
+			var update = {
+				viaDiameter: getValueMm('via-outer'),
+				holeDiameter: getValueMm('via-inner'),
+				lineWidth: getValueMm('line-width'),
+				lineLength: getValueMm('line-length'),
+				staggerLength: getValueMm('stagger-length'),
+				viaTypeIndex: parseInt(document.getElementById('via-type').value) || 0
 			};
-			console.warn('[IFrame] 发送启用消息，参数:', params);
-			if (typeof eda !== 'undefined' && eda.sys_MessageBus) {
-				eda.sys_MessageBus.publishPublic('pad-fanout-action', { action: 'enable', params: params });
-			}
+			eda.sys_MessageBus.publishPublic('pad-fanout-params-update', update);
 		}
-		function toggleMode() {
-			console.warn('[IFrame] toggleMode() 被调用, isEnabled:', isEnabled);
-			isEnabled = !isEnabled;
-			var btn = document.getElementById('btn-toggle');
-			var cancelBtn = document.getElementById('btn-cancel');
-			var status = document.getElementById('status-value');
-			if (isEnabled) {
-				console.warn('[IFrame] 启用扇出模式');
-				status.className = 'status-value active';
-				status.textContent = '已启用';
-				btn.textContent = '已启用';
-				btn.disabled = true;
-				cancelBtn.style.display = 'block';
-				sendEnableWithParams();
-			} else {
-				cancelFanout();
-			}
+
+		function bindParamInputs() {
+			['via-outer', 'via-inner', 'line-width', 'line-length', 'stagger-length'].forEach(function(id) {
+				document.getElementById(id).addEventListener('change', sendParamsUpdate);
+			});
+			document.getElementById('via-type').addEventListener('change', sendParamsUpdate);
 		}
-		function cancelFanout() {
-			console.warn('[IFrame] cancelFanout() 被调用');
-			isEnabled = false;
-			var btn = document.getElementById('btn-toggle');
-			var cancelBtn = document.getElementById('btn-cancel');
-			var status = document.getElementById('status-value');
-			status.className = 'status-value inactive';
-			status.textContent = '未启用';
-			btn.textContent = '启用扇出';
-			btn.disabled = false;
-			cancelBtn.style.display = 'none';
-			sendMessage('cancel');
-		}
-		// 订阅主插件推送的初始参数
+
 		function initMessageSubscription() {
-			if (typeof eda !== 'undefined' && eda.sys_MessageBus) {
-				eda.sys_MessageBus.subscribePublic('pad-fanout-init', function(params) {
-					console.warn('[IFrame] 收到初始参数:', params);
-					if (params.viaDiameter) document.getElementById('via-outer').value = params.viaDiameter.toFixed(3);
-					if (params.holeDiameter) document.getElementById('via-inner').value = params.holeDiameter.toFixed(3);
-					if (params.lineWidth) document.getElementById('line-width').value = params.lineWidth.toFixed(3);
-					if (params.lineLength) document.getElementById('line-length').value = params.lineLength.toFixed(3);
-				});
-				console.warn('[IFrame] 已订阅 pad-fanout-init');
-			}
+			if (typeof eda === 'undefined' || !eda.sys_MessageBus) return;
+
+			eda.sys_MessageBus.subscribePublic('pad-fanout-init', function(params) {
+				if (params.viaDiameter) setValueFromMm('via-outer', params.viaDiameter);
+				if (params.holeDiameter) setValueFromMm('via-inner', params.holeDiameter);
+				if (params.lineWidth) setValueFromMm('line-width', params.lineWidth);
+				if (params.lineLength) setValueFromMm('line-length', params.lineLength);
+				if (params.staggerLength !== undefined) setValueFromMm('stagger-length', params.staggerLength);
+				if (Array.isArray(params.viaTypeOptions) && params.viaTypeOptions.length > 0) {
+					var select = document.getElementById('via-type');
+					select.innerHTML = '';
+					params.viaTypeOptions.forEach(function(opt, i) {
+						var el = document.createElement('option');
+						el.value = i;
+						el.textContent = opt.label;
+						select.appendChild(el);
+					});
+				}
+			});
+
+			eda.sys_MessageBus.subscribePublic('pad-fanout-reset-ui', function() {
+				document.getElementById('cursor-toggle').checked = false;
+			});
 		}
+
 		document.addEventListener('keydown', function(e) {
-			if (e.key === 'Escape' && isEnabled) {
-				console.warn('[IFrame] ESC 键按下，取消扇出');
-				cancelFanout();
+			if (e.key === 'Escape') {
+				var toggle = document.getElementById('cursor-toggle');
+				if (toggle.checked) {
+					toggle.checked = false;
+					if (typeof eda !== 'undefined' && eda.sys_MessageBus) {
+						eda.sys_MessageBus.publishPublic('pad-fanout-cursor-toggle', { enabled: false });
+					}
+				} else {
+					if (typeof eda !== 'undefined' && eda.sys_MessageBus) {
+						eda.sys_MessageBus.publishPublic('pad-fanout-action', { action: 'cancel' });
+					}
+				}
 			}
 		});
-		console.warn('[IFrame] iframe 脚本已加载');
-		console.warn('[IFrame] 检查 eda 是否可用:', typeof eda);
+
 		initMessageSubscription();
+		bindParamInputs();
 	</script>
 </body>
 </html>

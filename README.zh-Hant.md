@@ -1,43 +1,59 @@
 [简体中文](./README.md) | [English](./README.en.md) | [繁體中文](#) | [日本語](./README.ja.md) | [Русский](./README.ru.md)
 
-# pro-api-sdk
+# 焊盤扇出
 
-嘉立創EDA & EasyEDA 專業版擴展 API 開發工具
+嘉立創EDA專業版 PCB 焊盤扇出過孔插件 v2.3.1
 
-<a href="https://github.com/easyeda/pro-api-sdk" style="vertical-align: inherit;" target="_blank"><img src="https://img.shields.io/github/stars/easyeda/pro-api-sdk" alt="GitHub Repo Stars" class="not-medium-zoom-image" style="display: inline; vertical-align: inherit;" /></a>&nbsp;<a href="https://github.com/easyeda/pro-api-sdk/issues" style="vertical-align: inherit;" target="_blank"><img src="https://img.shields.io/github/issues/easyeda/pro-api-sdk" alt="GitHub Issues" class="not-medium-zoom-image" style="display: inline; vertical-align: inherit;" /></a>&nbsp;<a href="https://github.com/easyeda/pro-api-sdk" style="vertical-align: inherit;" target="_blank"><img src="https://img.shields.io/github/repo-size/easyeda/pro-api-sdk" alt="GitHub Repo Size" class="not-medium-zoom-image" style="display: inline; vertical-align: inherit;" /></a>&nbsp;<a href="https://choosealicense.com/licenses/apache-2.0/" style="vertical-align: inherit;" target="_blank"><img src="https://img.shields.io/github/license/easyeda/pro-api-sdk" alt="GitHub License" class="not-medium-zoom-image" style="display: inline; vertical-align: inherit;" /></a>&nbsp;<a href="https://www.npmjs.com/package/@jlceda/pro-api-types" style="vertical-align: inherit;" target="_blank"><img src="https://img.shields.io/npm/v/%40jlceda%2Fpro-api-types?label=pro-api-types" alt="NPM Version" class="not-medium-zoom-image" style="display: inline; vertical-align: inherit;" /></a>&nbsp;<a href="https://www.npmjs.com/package/@jlceda/pro-api-types" style="vertical-align: inherit;" target="_blank"><img src="https://img.shields.io/npm/d18m/%40jlceda%2Fpro-api-types" alt="NPM Downloads" class="not-medium-zoom-image" style="display: inline; vertical-align: inherit;" /></a>
+## 功能介紹
 
-> [!NOTE]
->
-> 有關 嘉立創EDA專業版 擴展程式開發的更多資訊，請訪問：[https://prodocs.easyeda.com/cn/api/guide/](https://prodocs.easyeda.com/cn/api/guide/)
+在 PCB 設計中，對選中的焊盤自動建立扇出過孔與走線。
 
-## 進入開發
+**主要功能：**
 
-本開發工具組包含了用於開發 [嘉立創EDA專業版](https://pro.easyeda.com/) 擴展程式的所有環境和工具，並內置了 ESLint 的推薦規則。
+- **單焊盤扇出**：選取單個焊盤後，使用方向鍵執行扇出
+- **批量扇出**：框選多個焊盤，統一方向批量扇出，按焊盤編號順序執行
+- **方向鍵扇出**：UI 提供 8 個方向鍵；圓形焊盤支援 8 方向，其他形狀支援 4 方向
+- **游標扇出**：啟用游標扇出模式後，點擊畫布空白處會自動判定方向並執行扇出
+- **盲埋孔支援**：自動讀取 PCB 設計規則中的盲孔/埋孔設定，支援通孔/盲孔/埋孔選擇
+- **規則跟隨**：啟動時自動讀取 PCB 設計規則中的過孔尺寸與走線寬度作為預設值；支援 mm/mil 單位自動判別與切換
+- **參差扇出**：框選多焊盤時可設定參差長度，讓相鄰焊盤交替使用不同扇出長度
+- **旋轉焊盤支援**：非圓形焊盤若有旋轉角，方向鍵對應焊盤的本地座標方向
 
-1. 克隆 [pro-api-sdk](https://github.com/easyeda/pro-api-sdk) 項目倉庫到本地
+## 使用方法
 
-    ```shell
-    git clone --depth=1 https://github.com/easyeda/pro-api-sdk.git
-    ```
+1. 在 EDA 上方選單 **焊盤扇出** → **焊盤扇出…** 啟動外掛
+2. 在 PCB 畫布中單選或框選焊盤
+3. 點擊 UI 面板中的方向鍵執行扇出；或啟用「游標扇出」開關後，於畫布空白處點擊執行
+4. 可在 UI 面板調整下列參數：
+   - 過孔類型（通孔 / 盲孔 / 埋孔）
+   - 過孔外徑、孔徑（mm）
+   - 走線寬度、走線長度（mm）
+   - 參差長度（mm，用於批量扇出時相鄰焊盤交替線長）
+5. 點擊「↺ 刷新」可重新讀取當前 PCB 設計規則
+![alt text](企业微信截图_17769280433269.png)
 
-2. 初始化開發環境（安裝依賴）
+## 注意事項
 
-    ```shell
-    npm install
-    ```
+- 非圓形焊盤若有旋轉角，方向鍵所指為焊盤的**本地座標系**方向，而非畫布全域方向
+- 斜向方向鍵（↖↗↙↘）僅對圓形焊盤有效；對矩形等焊盤會提示不支援
+- 框選多焊盤時，游標扇出以距滑鼠最近的焊盤為參考原點判定方向
 
-3. 進行些許變更 ...
+## 建置
 
-4. 編譯擴展程式
+```shell
+npm install          # 安裝相依套件
+npm run compile      # 編譯 TypeScript → dist/index.js
+npm run build        # 編譯 + 打包 → build/dist/*.eext
+npm run lint         # ESLint 檢查
+npm run fix          # ESLint 自動修正
+```
 
-    ```shell
-    npm run build
-    ```
+建置產物 `.eext` 位於 `build/dist/`，可在 EDA 擴充管理員中匯入使用。
 
-5. 在 嘉立創EDA專業版 中安裝生成在 `./build/dist/` 下的擴展程式
+## 安裝
 
-## 開源許可
+**EDA 專業版 V3：** 上方選單 → 進階 → 擴充管理員… → 匯入
 
-<a href="https://choosealicense.com/licenses/apache-2.0/" style="vertical-align: inherit;" target="_blank"><img src="https://img.shields.io/github/license/easyeda/pro-api-sdk" alt="GitHub License" class="not-medium-zoom-image" style="display: inline; vertical-align: inherit;" /></a>
+## 開源授權
 
-本開發工具組使用 [Apache License 2.0](https://choosealicense.com/licenses/apache-2.0/) 開源許可協定，你僅可以將 **嘉立创EDA**、**嘉立創EDA**、**EasyEDA** 商標資訊用於依託於本工具組開發的擴展程式的 **功能描述部分** 和 **開源發佈的標題部分**。
+[Apache License 2.0](https://choosealicense.com/licenses/apache-2.0/)

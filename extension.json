@@ -1,27 +1,27 @@
 {
-	"name": "pad-fanout",
+	"name": "eext-pad-fanout",
 	"uuid": "448d530c15214d55b1addae1af2ff06f",
-	"displayName": "Pad Fanout",
-	"description": "单焊盘扇出过孔插件",
-	"version": "1.8.0",
+	"displayName": "焊盘扇出",
+	"description": "焊盘扇出过孔插件",
+	"version": "2.3.1",
 	"publisher": "",
 	"engines": {
 		"eda": "^3.0.0"
 	},
 	"license": "Apache-2.0",
 	"repository": {
-		"type": "extension-store",
-		"url": ""
+		"type": "github",
+		"url": "https://github.com/easyeda/eext-pad-fanout"
 	},
-	"categories": "Other",
+	"categories": "PCB",
 	"keywords": [
-		"SDK"
+		"SDK,pcb"
 	],
 	"images": {
 		"logo": "./images/logo.png"
 	},
-	"homepage": "",
-	"bugs": "",
+	"homepage": "https://github.com/easyeda",
+	"bugs": "https://github.com/easyeda/eext-pad-fanout/issues",
 	"activationEvents": {
 		"onCommandFinished": {
 			"pad-fanout.stop": "stopPlugin"
@@ -32,39 +32,32 @@
 		"en": {
 			"pad_fanout": "Pad Fanout",
 			"fanout_tools": "Fanout Tools",
-			"single_pad_fanout": "Single Pad Fanout",
+			"single_pad_fanout": "Pad Fanout",
 			"via_type": "Via Type",
 			"through": "Through",
 			"blind_1_2": "Blind 1-2",
-			"blind_1_3": "Blind 1-3",
-			"hints": "Left-click: Confirm | Right-click/ESC: Cancel"
+			"blind_1_3": "Blind 1-3"
 		},
 		"zh-Hans": {
-			"pad_fanout": "单焊盘扇出",
+			"pad_fanout": "焊盘扇出",
 			"fanout_tools": "扇出工具",
-			"single_pad_fanout": "单焊盘扇出",
+			"single_pad_fanout": "焊盘扇出",
 			"via_type": "过孔类型",
 			"through": "通孔",
 			"blind_1_2": "盲孔1-2",
-			"blind_1_3": "盲孔1-3",
-			"hints": "左键: 确认扇出 | 右键/ESC: 取消"
+			"blind_1_3": "盲孔1-3"
 		}
 	},
 	"headerMenus": {
 		"pcb": [
 			{
 				"id": "Fanout",
-				"title": "fanout_tools",
+				"title": "焊盘扇出",
 				"menuItems": [
 					{
 						"id": "pad-fanout",
-						"title": "single_pad_fanout",
+						"title": "焊盘扇出…",
 						"registerFn": "padFanout"
-					},
-					{
-						"id": "pad-fanout-stop",
-						"title": "Stop",
-						"registerFn": "stopPlugin"
 					}
 				]
 			}

@@ -16,3 +16,6 @@
 /tsconfig.json
 .eslintcache
 debug.log
+/docs
+/.claude
+/.opencode
