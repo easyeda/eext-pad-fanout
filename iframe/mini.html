@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="UTF-8">
+	<style>
+		* { margin: 0; padding: 0; box-sizing: border-box; }
+		html, body {
+			width: 100%;
+			background: #1e1e1e;
+			font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+			overflow: hidden;
+		}
+		.mini-bar {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			padding: 4px 8px;
+			gap: 8px;
+		}
+		.toggle-switch { position: relative; display: inline-block; width: 36px; height: 20px; flex-shrink: 0; }
+		.toggle-switch input { opacity: 0; width: 0; height: 0; }
+		.toggle-slider {
+			position: absolute; cursor: pointer; inset: 0;
+			background: #3a3a3a; border-radius: 20px;
+			transition: 0.2s;
+		}
+		.toggle-slider:before {
+			content: ''; position: absolute;
+			width: 14px; height: 14px; left: 3px; bottom: 3px;
+			background: #aaa; border-radius: 50%; transition: 0.2s;
+		}
+		.toggle-switch input:checked + .toggle-slider { background: #667eea; }
+		.toggle-switch input:checked + .toggle-slider:before { transform: translateX(16px); background: #fff; }
+		.mini-label { font-size: 12px; color: #ccc; white-space: nowrap; }
+		.btn-refresh {
+			background: none;
+			border: 1px solid #555;
+			border-radius: 3px;
+			color: #fff;
+			font-size: 12px;
+			padding: 2px 8px;
+			cursor: pointer;
+			line-height: 1;
+			flex-shrink: 0;
+		}
+		.btn-refresh:hover { background: #2a2a2a; }
+		.btn-expand {
+			background: none;
+			border: 1px solid #555;
+			border-radius: 3px;
+			color: #fff;
+			font-size: 12px;
+			padding: 2px 8px;
+			cursor: pointer;
+			line-height: 1;
+			flex-shrink: 0;
+		}
+		.btn-expand:hover { background: #2a2a2a; }
+	</style>
+</head>
+<body>
+	<div class="mini-bar">
+		<span class="mini-label">光标</span>
+		<label class="toggle-switch">
+			<input type="checkbox" id="cursor-toggle" onchange="onCursorToggle()">
+			<span class="toggle-slider"></span>
+		</label>
+		<button class="btn-refresh" onclick="doRefresh()" title="刷新PCB规则">↺</button>
+		<button class="btn-expand" onclick="doExpand()" title="展开主面板">▢</button>
+	</div>
+
+	<script>
+		function onCursorToggle() {
+			var enabled = document.getElementById('cursor-toggle').checked;
+			if (typeof eda !== 'undefined' && eda.sys_MessageBus) {
+				eda.sys_MessageBus.publishPublic('pad-fanout-cursor-toggle', { enabled: enabled });
+			}
+		}
+
+		function doExpand() {
+			if (typeof eda !== 'undefined' && eda.sys_MessageBus) {
+				eda.sys_MessageBus.publishPublic('pad-fanout-restore-main', {});
+			}
+		}
+
+		function doRefresh() {
+			if (typeof eda !== 'undefined' && eda.sys_MessageBus) {
+				eda.sys_MessageBus.publishPublic('pad-fanout-refresh', {});
+			}
+		}
+
+		function initSubscription() {
+			if (typeof eda === 'undefined' || !eda.sys_MessageBus) return;
+
+			eda.sys_MessageBus.subscribePublic('pad-fanout-cursor-toggle', function(msg) {
+				document.getElementById('cursor-toggle').checked = !!msg.enabled;
+			});
+
+			eda.sys_MessageBus.subscribePublic('pad-fanout-mini-init', function(msg) {
+				document.getElementById('cursor-toggle').checked = !!msg.cursorEnabled;
+			});
+
+			eda.sys_MessageBus.subscribePublic('pad-fanout-reset-ui', function() {
+				document.getElementById('cursor-toggle').checked = false;
+			});
+		}
+
+		initSubscription();
+	</script>
+</body>
+</html>

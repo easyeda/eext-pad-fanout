@@ -112,12 +112,6 @@
 		.btn-dir:hover { background: #3a3a3a; }
 		.btn-dir:active { background: #667eea; }
 		.dir-placeholder { background: transparent; }
-		.dir-note {
-			font-size: 9px;
-			color: #ccc;
-			margin-top: 4px;
-			line-height: 1.4;
-		}
 	</style>
 </head>
 <body>
@@ -178,7 +172,6 @@
 				<button class="btn-dir" onclick="clickDir(0,-1)">↓</button>
 				<button class="btn-dir" onclick="clickDir(1,-1)">↘</button>
 			</div>
-			<div class="dir-note">注意：非圆形焊盘有旋转角时，方向为焊盘局部坐标方向</div>
 		</div>
 	</div>
 
@@ -252,6 +245,11 @@
 				staggerLength: getValueMm('stagger-length'),
 				viaTypeIndex: parseInt(document.getElementById('via-type').value) || 0
 			};
+			// 保存线长和参差到 localStorage（跨模块重载保留）
+			try {
+				localStorage.setItem('pad-fanout-lineLength', getValueMm('line-length').toString());
+				localStorage.setItem('pad-fanout-staggerLength', getValueMm('stagger-length').toString());
+			} catch(e) { /* 忽略 */ }
 			eda.sys_MessageBus.publishPublic('pad-fanout-params-update', update);
 		}
 
@@ -269,8 +267,23 @@
 				if (params.viaDiameter) setValueFromMm('via-outer', params.viaDiameter);
 				if (params.holeDiameter) setValueFromMm('via-inner', params.holeDiameter);
 				if (params.lineWidth) setValueFromMm('line-width', params.lineWidth);
-				if (params.lineLength) setValueFromMm('line-length', params.lineLength);
-				if (params.staggerLength !== undefined) setValueFromMm('stagger-length', params.staggerLength);
+				// 线长和参差优先从 localStorage 恢复（规则中无线长来源）
+				var savedLineLength = null;
+				var savedStagger = null;
+				try {
+					savedLineLength = localStorage.getItem('pad-fanout-lineLength');
+					savedStagger = localStorage.getItem('pad-fanout-staggerLength');
+				} catch(e) { /* 忽略 */ }
+				if (savedLineLength !== null) {
+					setValueFromMm('line-length', parseFloat(savedLineLength));
+				} else if (params.lineLength) {
+					setValueFromMm('line-length', params.lineLength);
+				}
+				if (savedStagger !== null) {
+					setValueFromMm('stagger-length', parseFloat(savedStagger));
+				} else if (params.staggerLength !== undefined) {
+					setValueFromMm('stagger-length', params.staggerLength);
+				}
 				if (Array.isArray(params.viaTypeOptions) && params.viaTypeOptions.length > 0) {
 					var select = document.getElementById('via-type');
 					select.innerHTML = '';
@@ -281,10 +294,23 @@
 						select.appendChild(el);
 					});
 				}
+				// localStorage 恢复值后同步给后端
+				sendParamsUpdate();
 			});
 
 			eda.sys_MessageBus.subscribePublic('pad-fanout-reset-ui', function() {
 				document.getElementById('cursor-toggle').checked = false;
+			});
+
+			eda.sys_MessageBus.subscribePublic('pad-fanout-net-params', function(params) {
+				if (params.lineWidth) setValueFromMm('line-width', params.lineWidth);
+				if (params.viaDiameter) setValueFromMm('via-outer', params.viaDiameter);
+				if (params.holeDiameter) setValueFromMm('via-inner', params.holeDiameter);
+				sendParamsUpdate();
+			});
+
+			eda.sys_MessageBus.subscribePublic('pad-fanout-cursor-toggle', function(msg) {
+				document.getElementById('cursor-toggle').checked = !!msg.enabled;
 			});
 		}
 

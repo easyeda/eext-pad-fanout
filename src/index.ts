@@ -8,7 +8,8 @@ import * as extensionConfig from '../extension.json';
 /// <reference types="@jlceda/pro-api-types" />
 
 function mmToMil(mm: number): number {
-	return eda.sys_Unit.mmToMil(mm);
+	// 四舍五入到 4 位小数，避免 mm↔mil 双向转换累积浮点误差
+	return Math.round(eda.sys_Unit.mmToMil(mm) * 10000) / 10000;
 }
 
 function milToMm(mil: number): number {
@@ -45,6 +46,14 @@ interface FanoutParams {
 	selectedViaTypeIndex: number;
 }
 
+interface NetRuleParams {
+	lineWidthMil: number;
+	viaDiameterMil: number;
+	holeDiameterMil: number;
+	trackRuleName: string;
+	viaRuleName: string;
+}
+
 type WorkState = 'IDLE' | 'PAD_SELECTED';
 
 interface SelectedPadInfo {
@@ -63,12 +72,15 @@ interface FanoutState {
 	selectedPadShape: string | null;
 	selectedPadRotation: number | null;
 	workState: WorkState;
-	ignoreNextEmptyClick: boolean;
+	lastActionTime: number;
 	selectedPads: SelectedPadInfo[];
 	selectionMode: 'SINGLE' | 'MULTI' | null;
 	params: FanoutParams;
 	cursorFanoutEnabled: boolean;
 	componentCenter: { x: number; y: number } | null;
+	netRuleMap: Map<string, NetRuleParams>;
+	defaultNetParams: NetRuleParams | null;
+	singleStaggerIndex: number;
 }
 
 const fanoutState: FanoutState = {
@@ -78,7 +90,7 @@ const fanoutState: FanoutState = {
 	selectedPadShape: null,
 	selectedPadRotation: null,
 	workState: 'IDLE',
-	ignoreNextEmptyClick: false,
+	lastActionTime: 0,
 	selectedPads: [],
 	selectionMode: null,
 	params: {
@@ -92,19 +104,23 @@ const fanoutState: FanoutState = {
 	},
 	cursorFanoutEnabled: false,
 	componentCenter: null,
+	netRuleMap: new Map(),
+	defaultNetParams: null,
+	singleStaggerIndex: 0,
 };
 
 const listenerId = 'pad-fanout-listener';
 const MESSAGE_TOPIC = 'pad-fanout-action';
 const MESSAGE_TOPIC_PARAMS_UPDATE = 'pad-fanout-params-update';
 const MESSAGE_TOPIC_PAD_SELECTED = 'pad-fanout-pad-selected';
+const MESSAGE_TOPIC_NET_PARAMS = 'pad-fanout-net-params';
 const MESSAGE_TOPIC_DIRECTION = 'pad-fanout-direction';
 const MESSAGE_TOPIC_CURSOR_TOGGLE = 'pad-fanout-cursor-toggle';
 const MESSAGE_TOPIC_REFRESH = 'pad-fanout-refresh';
 const MESSAGE_TOPIC_RESET_UI = 'pad-fanout-reset-ui';
 
 const IFRAME_WIDTH = 190;
-const IFRAME_HEIGHT_EXPANDED = 400;
+const IFRAME_HEIGHT_EXPANDED = 370;
 
 export function activate(_status?: 'onStartupFinished', _arg?: string): void {
 	console.warn(`[PadFanout] ========== 插件加载 ==========`);
@@ -119,12 +135,75 @@ export function deactivate(): void {
 	console.warn(`[PadFanout] =================================`);
 }
 
+const MINI_IFRAME_ID = 'pad-fanout-mini';
+const MINI_IFRAME_WIDTH = 150;
+const MINI_IFRAME_HEIGHT = 40;
+
+let miniIframeOpen = false;
+let mainPanelMinimized = false;
+
+function openMiniIframe(): void {
+	eda.sys_IFrame.closeIFrame('pad-fanout-dialog');
+	mainPanelMinimized = true;
+	setTimeout(() => {
+		eda.sys_IFrame.openIFrame('./iframe/mini.html', MINI_IFRAME_WIDTH, MINI_IFRAME_HEIGHT, MINI_IFRAME_ID, {
+			title: '扇出',
+			buttonCallbackFn: (button) => {
+				if (button === 'close') {
+					miniIframeOpen = false;
+					mainPanelMinimized = false;
+				}
+			},
+		});
+		miniIframeOpen = true;
+		setTimeout(() => {
+			eda.sys_MessageBus.publishPublic('pad-fanout-mini-init', {
+				cursorEnabled: fanoutState.cursorFanoutEnabled,
+			});
+		}, 300);
+	}, 200);
+}
+
+function restoreMainPanel(): void {
+	closeMiniIframe();
+	mainPanelMinimized = false;
+	setTimeout(() => {
+		eda.sys_IFrame.openIFrame('./iframe/index.html', IFRAME_WIDTH, IFRAME_HEIGHT_EXPANDED, 'pad-fanout-dialog', {
+			title: '焊盘扇出',
+			minimizeButton: true,
+			minimizeStyle: 'collapsed',
+			buttonCallbackFn: (button) => {
+				if (button === 'close') {
+					closeMiniIframe();
+					handleIframeClose();
+				}
+				else if (button === 'minimize') {
+					openMiniIframe();
+				}
+			},
+		});
+		setTimeout(() => publishInitParams(), 500);
+	}, 200);
+}
+
+function closeMiniIframe(): void {
+	if (miniIframeOpen) {
+		eda.sys_IFrame.closeIFrame(MINI_IFRAME_ID);
+		miniIframeOpen = false;
+	}
+}
+
 export async function padFanout(): Promise<void> {
 	console.warn('[PadFanout] ========== 启动工具 ==========');
 	console.warn('[PadFanout] padFanout() 被调用');
 
 	resetState();
 	await loadPCBRuleDefaults();
+	// 启动时重置画布原点一次，避免在每次鼠标事件中重置（会产生多余的撤销历史）
+	try {
+		await eda.pcb_Document.setCanvasOrigin(0, 0);
+	}
+	catch { /* 忽略 */ }
 	registerEventHandlers();
 	subscribeMessage();
 	fanoutState.isEnabled = true;
@@ -137,7 +216,11 @@ export async function padFanout(): Promise<void> {
 		buttonCallbackFn: (button) => {
 			console.warn('[PadFanout] iframe 按钮被点击:', button);
 			if (button === 'close') {
+				closeMiniIframe();
 				handleIframeClose();
+			}
+			else if (button === 'minimize') {
+				openMiniIframe();
 			}
 		},
 	});
@@ -212,13 +295,8 @@ function subscribeMessage(): void {
 		if (!fanoutState.isEnabled || fanoutState.workState !== 'PAD_SELECTED')
 			return;
 		const { dx, dy } = message;
-		const isDiag = dx !== 0 && dy !== 0;
 
 		if (fanoutState.selectionMode === 'MULTI' && fanoutState.selectedPads.length > 0) {
-			if (isDiag) {
-				eda.sys_Message.showToastMessage('该方向不支持框选焊盘', ESYS_ToastMessageType.WARNING);
-				return;
-			}
 			const baseLength = fanoutState.params.lineLengthMil;
 			const stagger = fanoutState.params.staggerLengthMil;
 			// 按焊盘编号排序，保证相邻焊盘参差严格交替
@@ -241,18 +319,20 @@ function subscribeMessage(): void {
 			fanoutState.selectedPadNet = null;
 			fanoutState.selectedPadShape = null;
 			fanoutState.selectedPadRotation = null;
-			fanoutState.ignoreNextEmptyClick = false;
+			fanoutState.lastActionTime = 0;
 			eda.sys_MessageBus.publishPublic(MESSAGE_TOPIC_PAD_SELECTED, { mode: null });
 			eda.sys_Message.showToastMessage('扇出成功', ESYS_ToastMessageType.INFO);
 		}
 		else if (fanoutState.selectedPadPosition) {
-			if (isDiag && fanoutState.selectedPadShape !== 'ELLIPSE') {
-				eda.sys_Message.showToastMessage('该方向不支持此焊盘形状', ESYS_ToastMessageType.WARNING);
-				return;
+			const baseLength = fanoutState.params.lineLengthMil;
+			const stagger = fanoutState.params.staggerLengthMil;
+			if (stagger > 0) {
+				fanoutState.params.lineLengthMil = (fanoutState.singleStaggerIndex % 2 === 0) ? baseLength : baseLength + stagger;
 			}
 			await createFanoutByDirection(dx, dy);
-			resetAfterFanout();
-			eda.sys_MessageBus.publishPublic(MESSAGE_TOPIC_PAD_SELECTED, { mode: null });
+			fanoutState.params.lineLengthMil = baseLength;
+			fanoutState.singleStaggerIndex++;
+			fanoutState.lastActionTime = Date.now();
 			eda.sys_Message.showToastMessage('扇出成功', ESYS_ToastMessageType.INFO);
 		}
 	});
@@ -271,7 +351,86 @@ function subscribeMessage(): void {
 		eda.sys_Message.showToastMessage('规则已刷新', ESYS_ToastMessageType.INFO);
 	});
 
+	// 订阅迷你窗口展开主面板
+	eda.sys_MessageBus.subscribePublic('pad-fanout-restore-main', () => {
+		if (mainPanelMinimized) {
+			restoreMainPanel();
+		}
+	});
+
 	console.warn('[PadFanout] MessageBus 订阅成功');
+}
+
+function applyNetRuleParams(net: string | null): void {
+	const params = (net && fanoutState.netRuleMap.get(net)) || fanoutState.defaultNetParams;
+	if (!params)
+		return;
+	fanoutState.params.lineWidthMil = params.lineWidthMil;
+	fanoutState.params.viaDiameterMil = params.viaDiameterMil;
+	fanoutState.params.holeDiameterMil = params.holeDiameterMil;
+	console.warn(`[PadFanout] 网络规则应用: net=${net}, track=${params.trackRuleName}, via=${params.viaRuleName}, 线宽=${params.lineWidthMil} mil`);
+	eda.sys_MessageBus.publishPublic(MESSAGE_TOPIC_NET_PARAMS, {
+		lineWidth: milToMm(params.lineWidthMil),
+		viaDiameter: milToMm(params.viaDiameterMil),
+		holeDiameter: milToMm(params.holeDiameterMil),
+		ruleName: params.trackRuleName,
+	});
+}
+
+function applyMultiNetRuleParams(pads: SelectedPadInfo[]): void {
+	if (pads.length === 0)
+		return;
+	const firstNet = pads[0].net;
+	const allSameNet = pads.every(p => p.net === firstNet);
+	applyNetRuleParams(allSameNet ? firstNet : null);
+}
+
+function resolveTrackWidth(trackRules: any, ruleName: string): number | null {
+	if (!trackRules)
+		return null;
+	let rule: any;
+	if (ruleName === 'default') {
+		rule = Object.values(trackRules).find((r: any) => r.isSetDefault);
+	}
+	else {
+		rule = trackRules[ruleName];
+	}
+	if (!rule)
+		return null;
+	const unit: string = rule.unit ?? 'mil';
+	const formData = rule.form?.data;
+	if (!formData)
+		return null;
+	for (const entry of Object.values(formData)) {
+		const val = (entry as any)?.defaultValue;
+		if (val && typeof val === 'number') {
+			return unit === 'mm' ? mmToMil(val) : val;
+		}
+	}
+	return null;
+}
+
+function resolveViaSize(viaRules: any, ruleName: string): { viaDiameterMil: number; holeDiameterMil: number } | null {
+	if (!viaRules)
+		return null;
+	let rule: any;
+	if (ruleName === 'default') {
+		rule = Object.values(viaRules).find((r: any) => r.isSetDefault);
+	}
+	else {
+		rule = viaRules[ruleName];
+	}
+	if (!rule)
+		return null;
+	const unit: string = rule.unit ?? 'mil';
+	const outerDia: number | undefined = rule.form?.viaOuterdiameterDefault;
+	const innerDia: number | undefined = rule.form?.viaInnerdiameterDefault;
+	if (!outerDia || !innerDia)
+		return null;
+	return {
+		viaDiameterMil: unit === 'mm' ? mmToMil(outerDia) : outerDia,
+		holeDiameterMil: unit === 'mm' ? mmToMil(innerDia) : innerDia,
+	};
 }
 
 async function loadPCBRuleDefaults(): Promise<void> {
@@ -283,30 +442,60 @@ async function loadPCBRuleDefaults(): Promise<void> {
 			return;
 		}
 
-		const viaForm = physics['Via Size']?.viaSize?.form;
-		if (viaForm?.viaOuterdiameterDefault && viaForm?.viaInnerdiameterDefault) {
-			const viaUnit: string = physics['Via Size']?.viaSize?.unit ?? 'mil';
-			fanoutState.params.viaDiameterMil = viaUnit === 'mm'
-				? mmToMil(viaForm.viaOuterdiameterDefault)
-				: viaForm.viaOuterdiameterDefault;
-			fanoutState.params.holeDiameterMil = viaUnit === 'mm'
-				? mmToMil(viaForm.viaInnerdiameterDefault)
-				: viaForm.viaInnerdiameterDefault;
-			console.warn(`[PadFanout] 过孔规则(${viaUnit}): 外径=${fanoutState.params.viaDiameterMil} mil, 孔径=${fanoutState.params.holeDiameterMil} mil`);
+		const viaSizeRules = physics['Via Size'];
+		const trackRules = physics.Track;
+
+		// 解析默认规则参数
+		const defaultLineWidth = resolveTrackWidth(trackRules, 'default');
+		if (defaultLineWidth)
+			fanoutState.params.lineWidthMil = defaultLineWidth;
+
+		const defaultVia = resolveViaSize(viaSizeRules, 'default');
+		if (defaultVia) {
+			fanoutState.params.viaDiameterMil = defaultVia.viaDiameterMil;
+			fanoutState.params.holeDiameterMil = defaultVia.holeDiameterMil;
 		}
 
-		const trackRules = physics.Track;
-		if (trackRules) {
-			const defaultRule = Object.values(trackRules).find((r: any) => r.isSetDefault) as any;
-			const defaultWidth = defaultRule?.form?.data?.['1']?.defaultValue;
-			const trackUnit: string = defaultRule?.unit ?? 'mil';
-			if (defaultWidth) {
-				fanoutState.params.lineWidthMil = trackUnit === 'mm' ? mmToMil(defaultWidth) : defaultWidth;
-				console.warn(`[PadFanout] 走线规则(${trackUnit}): 线宽=${fanoutState.params.lineWidthMil} mil`);
+		console.warn(`[PadFanout] 默认规则: 线宽=${fanoutState.params.lineWidthMil} mil, 过孔外径=${fanoutState.params.viaDiameterMil} mil, 孔径=${fanoutState.params.holeDiameterMil} mil`);
+
+		// 构建默认网络参数
+		fanoutState.defaultNetParams = {
+			lineWidthMil: fanoutState.params.lineWidthMil,
+			viaDiameterMil: fanoutState.params.viaDiameterMil,
+			holeDiameterMil: fanoutState.params.holeDiameterMil,
+			trackRuleName: 'default',
+			viaRuleName: 'default',
+		};
+
+		// 构建网络→规则参数映射
+		fanoutState.netRuleMap.clear();
+		try {
+			const netRules: any[] = await eda.pcb_Drc.getNetRules();
+			if (Array.isArray(netRules)) {
+				for (const nr of netRules) {
+					const netName: string = nr.name;
+					if (!netName)
+						continue;
+					const trackName: string = nr.Track || 'default';
+					const viaName: string = nr['Via Size'] || 'default';
+					const lineWidth = resolveTrackWidth(trackRules, trackName) ?? fanoutState.defaultNetParams.lineWidthMil;
+					const via = resolveViaSize(viaSizeRules, viaName);
+					fanoutState.netRuleMap.set(netName, {
+						lineWidthMil: lineWidth,
+						viaDiameterMil: via?.viaDiameterMil ?? fanoutState.defaultNetParams.viaDiameterMil,
+						holeDiameterMil: via?.holeDiameterMil ?? fanoutState.defaultNetParams.holeDiameterMil,
+						trackRuleName: trackName,
+						viaRuleName: viaName,
+					});
+				}
+				console.warn(`[PadFanout] 网络规则映射: ${fanoutState.netRuleMap.size} 条`);
 			}
 		}
+		catch (err) {
+			console.warn('[PadFanout] 读取网络规则失败:', err);
+		}
 
-		// 读取盲埋孔规则列表，合并两个表并按层号判断类型
+		// 读取盲埋孔规则列表
 		const blindBuriedSection = physics['Blind/Buried Via'];
 		const options: ViaTypeOption[] = [
 			{ label: '通孔', viaType: EPCB_PrimitiveViaType.VIA, designRuleName: null },
@@ -328,7 +517,6 @@ async function loadPCBRuleDefaults(): Promise<void> {
 				options.push({
 					label: isBlind ? `盲孔 ${item.name}` : `埋孔 ${item.name}`,
 					viaType: EPCB_PrimitiveViaType.BLIND,
-					// 盲孔用 name，埋孔用 key（API 参数要求不同）
 					designRuleName: isBlind ? item.name : item.key,
 				});
 			}
@@ -381,32 +569,25 @@ async function handleMouseEvent(
 	if (!fanoutState.isEnabled) {
 		return;
 	}
-	////
-	try {
-		// 先尝试将画布原点重置为 (0,0)
-		await eda.pcb_Document.setCanvasOrigin(0, 0);
-		console.warn('[Fanout] 已成功将画布原点重置为 (0, 0)');
-
-		const canvasOrigin = await eda.pcb_Document.getCanvasOrigin();
-		if (canvasOrigin) {
-			console.warn(`[Fanout] 画布原点 (mil): (${canvasOrigin.offsetX}, ${canvasOrigin.offsetY})`);
-			console.warn(`[Fanout] 画布原点 (mm): ${formatPos(canvasOrigin.offsetX, canvasOrigin.offsetY)}`);
-		}
-	}
-	catch (err) {
-		console.error('[Fanout] 获取画布原点失败:', err);
-	}
-	//////
 	if (!props || props.length === 0) {
 		console.warn('[Fanout] Props为空');
 		if (fanoutState.workState === 'PAD_SELECTED') {
-			if (fanoutState.ignoreNextEmptyClick) {
-				fanoutState.ignoreNextEmptyClick = false;
-				console.warn('[Fanout] 忽略空点击');
+			if (Date.now() - fanoutState.lastActionTime < 300) {
+				console.warn('[Fanout] 防抖：忽略空点击');
 				return;
 			}
 			// 光标扇出：需开关开启
 			if (!fanoutState.cursorFanoutEnabled) {
+				// 光标扇出未开启，点击空白取消选中
+				fanoutState.workState = 'IDLE';
+				fanoutState.selectedPadPosition = null;
+				fanoutState.selectedPadNet = null;
+				fanoutState.selectedPadShape = null;
+				fanoutState.selectedPadRotation = null;
+				fanoutState.selectedPads = [];
+				fanoutState.selectionMode = null;
+				fanoutState.lastActionTime = 0;
+				eda.sys_MessageBus.publishPublic(MESSAGE_TOPIC_PAD_SELECTED, { mode: null });
 				return;
 			}
 			const mousePos = await eda.pcb_SelectControl.getCurrentMousePosition();
@@ -452,13 +633,32 @@ async function handleMouseEvent(
 					fanoutState.selectedPadNet = null;
 					fanoutState.selectedPadShape = null;
 					fanoutState.selectedPadRotation = null;
-					fanoutState.ignoreNextEmptyClick = false;
+					fanoutState.componentCenter = null;
+					fanoutState.lastActionTime = Date.now();
+					eda.sys_MessageBus.publishPublic(MESSAGE_TOPIC_PAD_SELECTED, { mode: null });
 					eda.sys_Message.showToastMessage('扇出成功', ESYS_ToastMessageType.INFO);
 				}
 				else if (fanoutState.selectedPadPosition) {
+					const baseLength = fanoutState.params.lineLengthMil;
+					const stagger = fanoutState.params.staggerLengthMil;
+					if (stagger > 0) {
+						fanoutState.params.lineLengthMil = (fanoutState.singleStaggerIndex % 2 === 0) ? baseLength : baseLength + stagger;
+					}
 					await createFanout(mousePos);
-					resetAfterFanout();
+					fanoutState.params.lineLengthMil = baseLength;
+					fanoutState.singleStaggerIndex++;
 					eda.sys_Message.showToastMessage('扇出成功', ESYS_ToastMessageType.INFO);
+					// 光标扇出单选：一次选中只扇出一次，重置到 IDLE
+					fanoutState.workState = 'IDLE';
+					fanoutState.selectedPadPosition = null;
+					fanoutState.selectedPadNet = null;
+					fanoutState.selectedPadShape = null;
+					fanoutState.selectedPadRotation = null;
+					fanoutState.selectedPads = [];
+					fanoutState.selectionMode = null;
+					fanoutState.componentCenter = null;
+					fanoutState.lastActionTime = Date.now();
+					eda.sys_MessageBus.publishPublic(MESSAGE_TOPIC_PAD_SELECTED, { mode: null });
 				}
 			}
 		}
@@ -507,7 +707,7 @@ async function handleMouseEvent(
 					const y = basePrim.getState_Y();
 					const net = basePrim.getState_Net();
 					const pad = basePrim.getState_Pad();
-					const padRotation = basePrim.getState_Rotation() * Math.PI / 180;
+					const padRotation = basePrim.getState_Rotation();
 					const shape = Array.isArray(pad) && pad.length > 0 ? String(pad[0]) : 'UNKNOWN';
 					const padNumber = Number.parseInt(basePrim.getState_PadNumber(), 10) || 0;
 
@@ -569,7 +769,7 @@ async function handleMouseEvent(
 				fanoutState.selectedPadNet = padInfos[0].net;
 				fanoutState.selectedPadShape = padInfos[0].shape;
 				fanoutState.workState = 'PAD_SELECTED';
-				fanoutState.ignoreNextEmptyClick = true;
+				fanoutState.lastActionTime = Date.now();
 				// 获取封装中心（用于光标扇出方向统一）
 				fanoutState.componentCenter = null;
 				try {
@@ -597,6 +797,7 @@ async function handleMouseEvent(
 					shape: padInfos[0].shape,
 					hasRotation: padInfos[0].rotation !== null && padInfos[0].rotation !== 0,
 				});
+				applyNetRuleParams(padInfos[0].net);
 			}
 			else {
 				console.warn('[Fanout] ========== 选中多个焊盘 ==========');
@@ -605,9 +806,13 @@ async function handleMouseEvent(
 
 				fanoutState.selectionMode = 'MULTI';
 				fanoutState.selectedPads = padInfos;
+				fanoutState.selectedPadPosition = null;
+				fanoutState.selectedPadNet = null;
+				fanoutState.selectedPadShape = null;
+				fanoutState.selectedPadRotation = null;
 				fanoutState.workState = 'PAD_SELECTED';
-				fanoutState.ignoreNextEmptyClick = true;
-				// 获取封装中心（用于光标扇出方向统一）
+				fanoutState.lastActionTime = Date.now();
+				fanoutState.singleStaggerIndex = 0;
 				fanoutState.componentCenter = null;
 				try {
 					const parentId = props[0]?.parentComponentPrimitiveId;
@@ -634,6 +839,7 @@ async function handleMouseEvent(
 					shape: null,
 					hasRotation: false,
 				});
+				applyMultiNetRuleParams(padInfos);
 			}
 		}
 		catch (err) {
@@ -666,7 +872,7 @@ async function handleMouseEvent(
 					const y = basePrim.getState_Y();
 					const net = basePrim.getState_Net();
 					const pad = basePrim.getState_Pad();
-					const padRotation = basePrim.getState_Rotation() * Math.PI / 180;
+					const padRotation = basePrim.getState_Rotation();
 					const shape = Array.isArray(pad) && pad.length > 0 ? String(pad[0]) : 'UNKNOWN';
 					const padNumber = Number.parseInt(basePrim.getState_PadNumber(), 10) || 0;
 					let componentCenter: { x: number; y: number } | null = null;
@@ -705,7 +911,7 @@ async function handleMouseEvent(
 				fanoutState.selectedPadNet = padInfos[0].net;
 				fanoutState.selectedPadShape = padInfos[0].shape;
 				fanoutState.selectedPads = [];
-				fanoutState.ignoreNextEmptyClick = true;
+				fanoutState.lastActionTime = Date.now();
 				// 更新封装中心
 				fanoutState.componentCenter = null;
 				try {
@@ -722,6 +928,7 @@ async function handleMouseEvent(
 					shape: padInfos[0].shape,
 					hasRotation: padInfos[0].rotation !== 0,
 				});
+				applyNetRuleParams(padInfos[0].net);
 			}
 			else {
 				console.warn('[Fanout] ========== 切换多个焊盘 ==========');
@@ -734,7 +941,8 @@ async function handleMouseEvent(
 				fanoutState.selectedPadNet = null;
 				fanoutState.selectedPadShape = null;
 				fanoutState.selectedPadRotation = null;
-				fanoutState.ignoreNextEmptyClick = true;
+				fanoutState.lastActionTime = Date.now();
+				fanoutState.singleStaggerIndex = 0;
 				// 更新封装中心
 				fanoutState.componentCenter = null;
 				try {
@@ -751,6 +959,7 @@ async function handleMouseEvent(
 					shape: null,
 					hasRotation: false,
 				});
+				applyMultiNetRuleParams(padInfos);
 			}
 		}
 		catch (err) {
@@ -764,7 +973,10 @@ async function handleMouseEvent(
 		fanoutState.selectedPadNet = null;
 		fanoutState.selectedPadShape = null;
 		fanoutState.selectedPadRotation = null;
-		fanoutState.ignoreNextEmptyClick = false;
+		fanoutState.selectedPads = [];
+		fanoutState.selectionMode = null;
+		fanoutState.componentCenter = null;
+		fanoutState.lastActionTime = 0;
 		eda.sys_MessageBus.publishPublic(MESSAGE_TOPIC_PAD_SELECTED, { mode: null });
 	}
 }
@@ -813,43 +1025,17 @@ function toLocalCoordinates(dx: number, dy: number, rotation: number): { dxLocal
 	return { dxLocal, dyLocal };
 }
 
-function getDirection4(dx: number, dy: number): { x: number; y: number } {
-	const absDx = Math.abs(dx);
-	const absDy = Math.abs(dy);
-
-	// if (absDx >= absDy) {
-	// 	return dx >= 0 ? { x: 1, y: 0 } : { x: -1, y: 0 };
-	// }
-	// else {
-	// 	return dy >= 0 ? { x: 0, y: 1 } : { x: 0, y: -1 };
-	// }
-	if (dx >= 0 && dx >= absDy)
-		return { x: 1, y: 0 };
-	if (dx < 0 && -dx >= absDy)
-		return { x: -1, y: 0 };
-	if (dy >= 0 && dy > absDx)
-		return { x: 0, y: 1 };
-	if (dy < 0 && -dy > absDx)
-		return { x: 0, y: -1 };
-	return { x: 0, y: 0 };
-}
-
 function getFanoutDirection(
 	dx: number,
 	dy: number,
 	padShape: string | null,
 	rotation: number | null,
 ): { x: number; y: number } {
-	if (padShape === 'ELLIPSE') {
-		return getDirection8(dx, dy);
-	}
-
-	if (rotation !== null && rotation !== 0) {
+	if (rotation !== null && rotation !== 0 && padShape !== 'ELLIPSE') {
 		const { dxLocal, dyLocal } = toLocalCoordinates(dx, dy, rotation);
-		return getDirection4(dxLocal, dyLocal);
+		return getDirection8(dxLocal, dyLocal);
 	}
-
-	return getDirection4(dx, dy);
+	return getDirection8(dx, dy);
 }
 
 function calculateViaPosition(
@@ -927,22 +1113,42 @@ function getDirectionName(direction: { x: number; y: number }): string {
 	return 'UNKNOWN';
 }
 
-async function createFanoutByDirection(localDirX: number, localDirY: number): Promise<void> {
+async function createFanoutByDirection(dirX: number, dirY: number): Promise<void> {
 	if (!fanoutState.selectedPadPosition)
 		return;
 	const rotation = fanoutState.selectedPadRotation;
 	const length = fanoutState.params.lineLengthMil;
-	const localDir = { x: localDirX * length, y: localDirY * length };
 	let globalDir: { x: number; y: number };
+
 	if (fanoutState.selectedPadShape === 'ELLIPSE' || !rotation) {
-		globalDir = localDir;
+		globalDir = { x: dirX * length, y: dirY * length };
 	}
 	else {
-		const rad = rotation * Math.PI / 180;
-		const cos = Math.cos(rad);
-		const sin = Math.sin(rad);
-		globalDir = { x: localDir.x * cos - localDir.y * sin, y: localDir.x * sin + localDir.y * cos };
+		const rotRad = rotation * Math.PI / 180;
+		const cos = Math.cos(rotRad);
+		const sin = Math.sin(rotRad);
+		const localAxes = [
+			{ x: cos, y: sin },
+			{ x: (cos - sin) / Math.SQRT2, y: (sin + cos) / Math.SQRT2 },
+			{ x: -sin, y: cos },
+			{ x: (-cos - sin) / Math.SQRT2, y: (-sin + cos) / Math.SQRT2 },
+			{ x: -cos, y: -sin },
+			{ x: (-cos + sin) / Math.SQRT2, y: (-sin - cos) / Math.SQRT2 },
+			{ x: sin, y: -cos },
+			{ x: (cos + sin) / Math.SQRT2, y: (sin - cos) / Math.SQRT2 },
+		];
+		let bestAxis = localAxes[0];
+		let bestDot = -Infinity;
+		for (const axis of localAxes) {
+			const dot = dirX * axis.x + dirY * axis.y;
+			if (dot > bestDot) {
+				bestDot = dot;
+				bestAxis = axis;
+			}
+		}
+		globalDir = { x: bestAxis.x * length, y: bestAxis.y * length };
 	}
+
 	const viaPos = {
 		x: fanoutState.selectedPadPosition.x + globalDir.x,
 		y: fanoutState.selectedPadPosition.y + globalDir.y,
@@ -1055,24 +1261,12 @@ function resetState(): void {
 	fanoutState.selectedPadNet = null;
 	fanoutState.selectedPadShape = null;
 	fanoutState.selectedPadRotation = null;
-	fanoutState.ignoreNextEmptyClick = false;
+	fanoutState.lastActionTime = 0;
 	fanoutState.selectedPads = [];
 	fanoutState.selectionMode = null;
 	fanoutState.cursorFanoutEnabled = false;
 	fanoutState.componentCenter = null;
-}
-
-function resetAfterFanout(): void {
-	console.warn('[PadFanout] 扇出完成后重置（保持启用状态）');
-	fanoutState.workState = 'IDLE';
-	fanoutState.selectedPadPosition = null;
-	fanoutState.selectedPadNet = null;
-	fanoutState.selectedPadShape = null;
-	fanoutState.selectedPadRotation = null;
-	fanoutState.ignoreNextEmptyClick = false;
-	fanoutState.selectedPads = [];
-	fanoutState.selectionMode = null;
-	fanoutState.componentCenter = null;
+	fanoutState.singleStaggerIndex = 0;
 }
 
 function enableFanout(): void {
@@ -1090,10 +1284,11 @@ function cancelFanout(): void {
 	fanoutState.selectedPadNet = null;
 	fanoutState.selectedPadShape = null;
 	fanoutState.selectedPadRotation = null;
-	fanoutState.ignoreNextEmptyClick = false;
+	fanoutState.lastActionTime = 0;
 	fanoutState.selectedPads = [];
 	fanoutState.selectionMode = null;
 	fanoutState.cursorFanoutEnabled = false;
+	fanoutState.singleStaggerIndex = 0;
 	// 通知 iframe 重置 UI 状态
 	eda.sys_MessageBus.publishPublic(MESSAGE_TOPIC_RESET_UI, {});
 	eda.sys_MessageBus.publishPublic(MESSAGE_TOPIC_PAD_SELECTED, { mode: null });
@@ -1103,6 +1298,7 @@ function cancelFanout(): void {
 function stopPlugin(): void {
 	console.warn('[PadFanout] ========== 停止插件 ==========');
 	console.warn('[PadFanout] 1. 关闭 iframe...');
+	closeMiniIframe();
 	eda.sys_IFrame.closeIFrame('pad-fanout-dialog');
 	console.warn('[PadFanout] 2. 移除事件处理器...');
 	unregisterEventHandlers();
