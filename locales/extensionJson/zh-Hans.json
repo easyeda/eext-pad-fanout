@@ -1,3 +1,7 @@
 {
-	"About...": "关于..."
+	"About...": "关于...",
+	"Pad Fanout": "焊盘扇出",
+	"Quickly fan out pads with vias to improve work efficiency": "能够快速对焊盘进行过孔扇出，提升工作效率",
+	"Fanout": "扇出",
+	"扇出": "扇出"
 }

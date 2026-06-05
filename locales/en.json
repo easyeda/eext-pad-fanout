@@ -1,4 +1,17 @@
 {
 	"About": "About",
-	"EasyEDA extension SDK v": "EasyEDA extension SDK v${1}"
+	"EasyEDA extension SDK v": "EasyEDA extension SDK v${1}",
+	"Refresh PCB Rules": "Refresh PCB Rules",
+	"Refresh": "Refresh",
+	"Via Type": "Via Type",
+	"Through": "Through",
+	"Outer Diameter": "Outer Diameter",
+	"Hole Diameter": "Hole Diameter",
+	"Line Width": "Line Width",
+	"Line Length": "Line Length",
+	"Stagger": "Stagger",
+	"Cursor Fanout": "Cursor Fanout",
+	"Fanout Direction": "Fanout Direction",
+	"Cursor": "Cursor",
+	"Expand Main Panel": "Expand Main Panel"
 }

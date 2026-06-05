@@ -1,4 +1,17 @@
 {
 	"About": "关于",
-	"EasyEDA extension SDK v": "嘉立创EDA 扩展 SDK v${1}"
+	"EasyEDA extension SDK v": "嘉立创EDA 扩展 SDK v${1}",
+	"Refresh PCB Rules": "刷新PCB规则",
+	"Refresh": "刷新",
+	"Via Type": "过孔类型",
+	"Through": "通孔",
+	"Outer Diameter": "外径",
+	"Hole Diameter": "孔径",
+	"Line Width": "线宽",
+	"Line Length": "线长",
+	"Stagger": "参差",
+	"Cursor Fanout": "光标扇出",
+	"Fanout Direction": "扇出方向",
+	"Cursor": "光标",
+	"Expand Main Panel": "展开主面板"
 }

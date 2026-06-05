@@ -121,33 +121,33 @@
 				<button class="unit-btn active" id="unit-mm" onclick="setUnit('mm')">mm</button>
 				<button class="unit-btn" id="unit-mil" onclick="setUnit('mil')">mil</button>
 			</div>
-			<button class="btn-refresh" onclick="doRefresh()" title="刷新PCB规则">↺ 刷新</button>
+			<button class="btn-refresh" id="btn-refresh" onclick="doRefresh()">↺</button>
 		</div>
 
 		<div class="form-row">
-			<label>过孔类型</label>
+			<label id="lbl-via-type">过孔类型</label>
 			<select id="via-type">
 				<option value="0">通孔</option>
 			</select>
 		</div>
 		<div class="form-row">
-			<label>外径</label>
+			<label id="lbl-outer">外径</label>
 			<input type="number" id="via-outer" value="0.610" step="0.001" min="0.001" max="100">
 		</div>
 		<div class="form-row">
-			<label>孔径</label>
+			<label id="lbl-inner">孔径</label>
 			<input type="number" id="via-inner" value="0.305" step="0.001" min="0.001" max="100">
 		</div>
 		<div class="form-row">
-			<label>线宽</label>
+			<label id="lbl-line-width">线宽</label>
 			<input type="number" id="line-width" value="0.254" step="0.001" min="0.001" max="100">
 		</div>
 		<div class="form-row">
-			<label>线长</label>
+			<label id="lbl-line-length">线长</label>
 			<input type="number" id="line-length" value="2.540" step="0.001" min="0.001" max="1000">
 		</div>
 		<div class="form-row">
-			<label>参差</label>
+			<label id="lbl-stagger">参差</label>
 			<input type="number" id="stagger-length" value="0.000" step="0.001" min="0" max="1000">
 		</div>
 
@@ -176,6 +176,29 @@
 	</div>
 
 	<script>
+		var edaObj = (typeof eda !== 'undefined') ? eda : (window.parent && window.parent.eda);
+		function t(tag) {
+			if (edaObj && edaObj.sys_I18n) return edaObj.sys_I18n.text(tag);
+			return tag;
+		}
+
+		function applyI18n() {
+			document.getElementById('btn-refresh').title = t('Refresh PCB Rules');
+			document.getElementById('btn-refresh').textContent = '↺ ' + t('Refresh');
+			document.getElementById('lbl-via-type').textContent = t('Via Type');
+			var viaTypeSelect = document.getElementById('via-type');
+			if (viaTypeSelect.options.length > 0) {
+				viaTypeSelect.options[0].textContent = t('Through');
+			}
+			document.getElementById('lbl-outer').textContent = t('Outer Diameter');
+			document.getElementById('lbl-inner').textContent = t('Hole Diameter');
+			document.getElementById('lbl-line-width').textContent = t('Line Width');
+			document.getElementById('lbl-line-length').textContent = t('Line Length');
+			document.getElementById('lbl-stagger').textContent = t('Stagger');
+			document.querySelector('.toggle-label').textContent = t('Cursor Fanout');
+			document.querySelector('.dir-label').textContent = t('Fanout Direction');
+		}
+
 		var currentUnit = 'mm';
 
 		function mmToMil(v) { return v * 39.3701; }
@@ -330,6 +353,7 @@
 			}
 		});
 
+		applyI18n();
 		initMessageSubscription();
 		bindParamInputs();
 	</script>
