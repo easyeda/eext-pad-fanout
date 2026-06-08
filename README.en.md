@@ -35,7 +35,7 @@ Automatically create fanout vias and traces for selected pads in PCB design.
 5. Click "↺ Refresh" to re-read current PCB design rules
 6. Click "−" to collapse the main panel; a mini popup appears when collapsed
 
-![alt text](企业微信截图_17769280433269.png)
+![img](./images/photo.png)
 
 ## Notes
 

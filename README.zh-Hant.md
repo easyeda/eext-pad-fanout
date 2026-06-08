@@ -35,7 +35,7 @@
 5. 點擊「↺ 刷新」可重新讀取當前 PCB 設計規則
 6. 點擊「−」可折疊主面板，折疊後出現迷你彈窗
 
-![alt text](./images/photo.png)
+![img](./images/photo.png)
 
 ## 注意事項
 
