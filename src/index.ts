@@ -147,7 +147,7 @@ function openMiniIframe(): void {
 	mainPanelMinimized = true;
 	setTimeout(() => {
 		eda.sys_IFrame.openIFrame('./iframe/mini.html', MINI_IFRAME_WIDTH, MINI_IFRAME_HEIGHT, MINI_IFRAME_ID, {
-			title: '扇出',
+			title: eda.sys_I18n.text('Fanout'),
 			buttonCallbackFn: (button) => {
 				if (button === 'close') {
 					miniIframeOpen = false;
@@ -169,7 +169,7 @@ function restoreMainPanel(): void {
 	mainPanelMinimized = false;
 	setTimeout(() => {
 		eda.sys_IFrame.openIFrame('./iframe/index.html', IFRAME_WIDTH, IFRAME_HEIGHT_EXPANDED, 'pad-fanout-dialog', {
-			title: '焊盘扇出',
+			title: eda.sys_I18n.text('Pad Fanout'),
 			minimizeButton: true,
 			minimizeStyle: 'collapsed',
 			buttonCallbackFn: (button) => {
@@ -210,7 +210,7 @@ export async function padFanout(): Promise<void> {
 
 	console.warn('[PadFanout] 打开 iframe...');
 	eda.sys_IFrame.openIFrame('./iframe/index.html', IFRAME_WIDTH, IFRAME_HEIGHT_EXPANDED, 'pad-fanout-dialog', {
-		title: '焊盘扇出',
+		title: eda.sys_I18n.text('Pad Fanout'),
 		minimizeButton: true,
 		minimizeStyle: 'collapsed',
 		buttonCallbackFn: (button) => {
@@ -321,7 +321,7 @@ function subscribeMessage(): void {
 			fanoutState.selectedPadRotation = null;
 			fanoutState.lastActionTime = 0;
 			eda.sys_MessageBus.publishPublic(MESSAGE_TOPIC_PAD_SELECTED, { mode: null });
-			eda.sys_Message.showToastMessage('扇出成功', ESYS_ToastMessageType.INFO);
+			eda.sys_Message.showToastMessage(eda.sys_I18n.text('Fanout Succeeded'), ESYS_ToastMessageType.INFO);
 		}
 		else if (fanoutState.selectedPadPosition) {
 			const baseLength = fanoutState.params.lineLengthMil;
@@ -333,7 +333,7 @@ function subscribeMessage(): void {
 			fanoutState.params.lineLengthMil = baseLength;
 			fanoutState.singleStaggerIndex++;
 			fanoutState.lastActionTime = Date.now();
-			eda.sys_Message.showToastMessage('扇出成功', ESYS_ToastMessageType.INFO);
+			eda.sys_Message.showToastMessage(eda.sys_I18n.text('Fanout Succeeded'), ESYS_ToastMessageType.INFO);
 		}
 	});
 
@@ -348,7 +348,7 @@ function subscribeMessage(): void {
 		console.warn('[PadFanout] 刷新 PCB 规则...');
 		await loadPCBRuleDefaults();
 		publishInitParams();
-		eda.sys_Message.showToastMessage('规则已刷新', ESYS_ToastMessageType.INFO);
+		eda.sys_Message.showToastMessage(eda.sys_I18n.text('Rules Refreshed'), ESYS_ToastMessageType.INFO);
 	});
 
 	// 订阅迷你窗口展开主面板
@@ -636,7 +636,7 @@ async function handleMouseEvent(
 					fanoutState.componentCenter = null;
 					fanoutState.lastActionTime = Date.now();
 					eda.sys_MessageBus.publishPublic(MESSAGE_TOPIC_PAD_SELECTED, { mode: null });
-					eda.sys_Message.showToastMessage('扇出成功', ESYS_ToastMessageType.INFO);
+					eda.sys_Message.showToastMessage(eda.sys_I18n.text('Fanout Succeeded'), ESYS_ToastMessageType.INFO);
 				}
 				else if (fanoutState.selectedPadPosition) {
 					const baseLength = fanoutState.params.lineLengthMil;
@@ -647,7 +647,7 @@ async function handleMouseEvent(
 					await createFanout(mousePos);
 					fanoutState.params.lineLengthMil = baseLength;
 					fanoutState.singleStaggerIndex++;
-					eda.sys_Message.showToastMessage('扇出成功', ESYS_ToastMessageType.INFO);
+					eda.sys_Message.showToastMessage(eda.sys_I18n.text('Fanout Succeeded'), ESYS_ToastMessageType.INFO);
 					// 光标扇出单选：一次选中只扇出一次，重置到 IDLE
 					fanoutState.workState = 'IDLE';
 					fanoutState.selectedPadPosition = null;
@@ -1157,7 +1157,7 @@ async function createFanoutByDirection(dirX: number, dirY: number): Promise<void
 	const selectedViaType = fanoutState.params.viaTypeOptions[fanoutState.params.selectedViaTypeIndex]
 		?? fanoutState.params.viaTypeOptions[0];
 	if (selectedViaType.viaType === EPCB_PrimitiveViaType.BLIND && !selectedViaType.designRuleName) {
-		eda.sys_Message.showToastMessage('未设计盲埋孔！', ESYS_ToastMessageType.WARNING);
+		eda.sys_Message.showToastMessage(eda.sys_I18n.text('Blind/Buried Via Not Designed!'), ESYS_ToastMessageType.WARNING);
 		return;
 	}
 	try {
@@ -1185,7 +1185,7 @@ async function createFanoutByDirection(dirX: number, dirY: number): Promise<void
 	}
 	catch (err) {
 		console.error('[Fanout] 方向键扇出失败:', err);
-		eda.sys_Message.showToastMessage('扇出失败', ESYS_ToastMessageType.ERROR);
+		eda.sys_Message.showToastMessage(eda.sys_I18n.text('Fanout Failed'), ESYS_ToastMessageType.ERROR);
 	}
 }
 
@@ -1215,7 +1215,7 @@ async function createFanout(targetPos: { x: number; y: number }): Promise<void> 
 
 		// 盲埋孔但无规则名称，说明 PCB 未配置对应规则
 		if (selectedViaType.viaType === EPCB_PrimitiveViaType.BLIND && !selectedViaType.designRuleName) {
-			eda.sys_Message.showToastMessage('未设计盲埋孔！', ESYS_ToastMessageType.WARNING);
+			eda.sys_Message.showToastMessage(eda.sys_I18n.text('Blind/Buried Via Not Designed!'), ESYS_ToastMessageType.WARNING);
 			return;
 		}
 
@@ -1249,7 +1249,7 @@ async function createFanout(targetPos: { x: number; y: number }): Promise<void> 
 	}
 	catch (err) {
 		console.error('[Fanout] 创建扇出过孔失败:', err);
-		eda.sys_Message.showToastMessage('扇出失败', ESYS_ToastMessageType.ERROR);
+		eda.sys_Message.showToastMessage(eda.sys_I18n.text('Fanout Failed'), ESYS_ToastMessageType.ERROR);
 	}
 }
 

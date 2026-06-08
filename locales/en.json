@@ -13,5 +13,11 @@
 	"Cursor Fanout": "Cursor Fanout",
 	"Fanout Direction": "Fanout Direction",
 	"Cursor": "Cursor",
-	"Expand Main Panel": "Expand Main Panel"
+	"Expand Main Panel": "Expand Main Panel",
+	"Pad Fanout": "Pad Fanout",
+	"Fanout Succeeded": "Fanout Succeeded",
+	"Rules Refreshed": "Rules Refreshed",
+	"Blind/Buried Via Not Designed!": "Blind/Buried Via Not Designed!",
+	"Fanout Failed": "Fanout Failed",
+	"Fanout": "Fanout"
 }

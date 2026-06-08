@@ -310,10 +310,11 @@
 				if (Array.isArray(params.viaTypeOptions) && params.viaTypeOptions.length > 0) {
 					var select = document.getElementById('via-type');
 					select.innerHTML = '';
+					var viaLabelMap = { '通孔': 'Through' };
 					params.viaTypeOptions.forEach(function(opt, i) {
 						var el = document.createElement('option');
 						el.value = i;
-						el.textContent = opt.label;
+						el.textContent = viaLabelMap[opt.label] ? t(viaLabelMap[opt.label]) : opt.label;
 						select.appendChild(el);
 					});
 				}

@@ -13,5 +13,11 @@
 	"Cursor Fanout": "光标扇出",
 	"Fanout Direction": "扇出方向",
 	"Cursor": "光标",
-	"Expand Main Panel": "展开主面板"
+	"Expand Main Panel": "展开主面板",
+	"Pad Fanout": "焊盘扇出",
+	"Fanout Succeeded": "扇出成功",
+	"Rules Refreshed": "规则已刷新",
+	"Blind/Buried Via Not Designed!": "未设计盲埋孔！",
+	"Fanout Failed": "扇出失败",
+	"Fanout": "扇出"
 }

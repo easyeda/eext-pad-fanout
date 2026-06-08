@@ -1,7 +1,9 @@
 {
 	"About...": "About...",
+	"Fanout": "Fanout",
 	"Pad Fanout": "Pad Fanout",
 	"Quickly fan out pads with vias to improve work efficiency": "Quickly fan out pads with vias to improve work efficiency",
-	"Fanout": "Fanout",
-	"扇出": "Fanout"
+	"扇出": "Fanout",
+	"焊盘扇出": "Pad Fanout",
+	"焊盘扇出…": "Pad Fanout..."
 }
